@@ -1,53 +1,63 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <h2>Essential Links</h2>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank">Forum</a></li>
-      <li><a href="https://gitter.im/vuejs/vue" target="_blank">Gitter Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank">Twitter</a></li>
-      <br>
-      <li><a href="http://vuejs-templates.github.io/webpack/" target="_blank">Docs for This Template</a></li>
-    </ul>
-    <h2>Ecosystem</h2>
-    <ul>
-      <li><a href="http://router.vuejs.org/" target="_blank">vue-router</a></li>
-      <li><a href="http://vuex.vuejs.org/" target="_blank">vuex</a></li>
-      <li><a href="http://vue-loader.vuejs.org/" target="_blank">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank">awesome-vue</a></li>
-    </ul>
-  </div>
+  <div id="pano"></div>
 </template>
 
 <script>
-export default {
-  name: 'hello',
-  data() {
-    return {
-      msg: 'Welcome to Your Vue.js App',
-    };
-  },
-};
+  export default {
+    name: 'hello',
+    data() {
+      return {
+        map: null,
+      };
+    },
+    methods: {
+      vueGoogleMapsInit() {
+        const location = { lat: 41.177246, lng: -8.596743 };
+
+        this.map = new window.google.maps.StreetViewPanorama(document.getElementById('pano'), {
+          position: location,
+          zoom: 1,
+          linksControl: false,
+          enableCloseButton: false,
+          clickToGo: false,
+        });
+
+        const testMarker = new window.google.maps.Marker({
+          position: { lat: 41.177246, lng: -8.596843 },
+          map: this.map,
+          title: 'Cafe',
+        });
+
+        testMarker.addListener('click', () => {
+          // eslint-disable-next-line no-alert
+          alert('Marker clicked');
+        });
+      },
+    },
+    mounted() {
+      if (window.vueGoogleMapsInit) {
+        this.vueGoogleMapsInit();
+        return;
+      }
+      window.vueGoogleMapsInit = this.vueGoogleMapsInit;
+      const googleMapScript = document.createElement('SCRIPT');
+      googleMapScript.setAttribute('src', 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
+      googleMapScript.setAttribute('async', '');
+      googleMapScript.setAttribute('defer', '');
+      document.body.appendChild(googleMapScript);
+    },
+    beforeDestroy() {
+
+    },
+  };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
-h1, h2 {
-  font-weight: normal;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-
-a {
-  color: #42b983;
-}
+<style lang="less">
+  #pano {
+    width: 100%;
+    height: 90%;
+    min-height: 500px;
+    min-width: 500px;
+    float: left;
+  }
 </style>
