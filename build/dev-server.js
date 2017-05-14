@@ -13,7 +13,10 @@ var proxyMiddleware = require('http-proxy-middleware')
 var webpackConfig = require('./webpack.dev.conf')
 
 // default port where dev server listens for incoming traffic
-var port = process.env.PORT || config.dev.port
+var port = process.env.WEB_PORT || config.dev.port
+
+var apiPort = process.env.API_PORT || config.dev.api_port;
+
 // automatically open browser, if not set will be false
 var autoOpenBrowser = !!config.dev.autoOpenBrowser
 // Define HTTP proxies to your custom API backend
@@ -48,6 +51,11 @@ Object.keys(proxyTable).forEach(function (context) {
   app.use(proxyMiddleware(options.filter || context, options))
 })
 
+app.use(proxyMiddleware('/api', {
+  target: 'http://localhost:' + apiPort,
+  changeOrigin: true
+}))
+
 // handle fallback for HTML5 history API
 app.use(require('connect-history-api-fallback')())
 
@@ -63,6 +71,7 @@ var staticPath = path.posix.join(config.dev.assetsPublicPath, config.dev.assetsS
 app.use(staticPath, express.static('./static'))
 
 var uri = 'http://localhost:' + port
+var uriApi = 'http://localhost:' + apiPort
 
 var _resolve
 var readyPromise = new Promise(resolve => {
@@ -79,11 +88,14 @@ devMiddleware.waitUntilValid(() => {
   _resolve()
 })
 
+var api = require('../api-server/api_server')().listen(apiPort)
+
 var server = app.listen(port)
 
 module.exports = {
   ready: readyPromise,
   close: () => {
     server.close()
+    api.close()
   }
 }
