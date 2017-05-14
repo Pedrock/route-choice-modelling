@@ -1,7 +1,7 @@
 import Vue from 'vue';
 import Router from 'vue-router';
-import Hello from '@/components/Hello';
-import Test from '@/components/Test';
+import Map from '@/components/Map';
+import Entry from '@/components/Entry';
 
 Vue.use(Router);
 
@@ -11,14 +11,14 @@ export default new Router({
   mode: 'history',
   routes: [
     {
-      path: '/',
-      name: 'Hello',
-      component: Hello,
+      path: '/map',
+      name: 'map',
+      component: Map,
     },
     {
-      path: '/test',
-      name: 'test',
-      component: Test,
+      path: '/',
+      name: 'entry',
+      component: Entry,
     },
   ],
 });
