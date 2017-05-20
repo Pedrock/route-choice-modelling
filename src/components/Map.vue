@@ -1,63 +1,104 @@
 <template>
-  <div id="pano"></div>
+  <div class="maps">
+    <div id="pano" ref="pano"></div>
+    <div id="map" ref="map"></div>
+  </div>
 </template>
 
 <script>
+  import ol from 'openlayers';
+
   export default {
-    name: 'hello',
+    name: 'map',
     data() {
       return {
-        map: null,
+        pano: null,
+        olmap: null,
+        location: { lat: 41.177246, lng: -8.596743 },
+        heading: 0,
       };
+    },
+    computed: {
+      openlayersLocation() {
+        const { lat, lng } = this.location;
+        return [lng, lat];
+      },
     },
     methods: {
       vueGoogleMapsInit() {
-        const location = { lat: 41.177246, lng: -8.596743 };
-
-        this.map = new window.google.maps.StreetViewPanorama(document.getElementById('pano'), {
-          position: location,
+        this.pano = new window.google.maps.StreetViewPanorama(this.$refs.pano, {
+          position: this.location,
           zoom: 1,
           linksControl: false,
           enableCloseButton: false,
           clickToGo: false,
+          fullscreenControl: false,
         });
 
-        const testMarker = new window.google.maps.Marker({
-          position: { lat: 41.177246, lng: -8.596843 },
-          map: this.map,
-          title: 'Cafe',
+        this.pano.addListener('pov_changed', () => {
+          this.heading = (Math.PI * this.pano.getPov().heading) / 180;
         });
-
-        testMarker.addListener('click', () => {
-          // eslint-disable-next-line no-alert
-          alert('Marker clicked');
+      },
+      initOpenLayers() {
+        this.olmap = new ol.Map({
+          target: this.$refs.map,
+          loadTilesWhileAnimating: true,
+          layers: [
+            new ol.layer.Tile({
+              source: new ol.source.OSM(),
+            }),
+          ],
+          view: new ol.View({
+            center: ol.proj.fromLonLat(this.openlayersLocation),
+            zoom: 16,
+          }),
         });
+      },
+    },
+    watch: {
+      location() {
+        this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+      },
+      heading() {
+        this.olmap.getView().setRotation(-this.heading);
       },
     },
     mounted() {
       if (window.vueGoogleMapsInit) {
         this.vueGoogleMapsInit();
-        return;
+      } else {
+        window.vueGoogleMapsInit = this.vueGoogleMapsInit;
+        const googleMapScript = document.createElement('SCRIPT');
+        googleMapScript.setAttribute('src', 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
+        googleMapScript.setAttribute('async', '');
+        googleMapScript.setAttribute('defer', '');
+        document.body.appendChild(googleMapScript);
       }
-      window.vueGoogleMapsInit = this.vueGoogleMapsInit;
-      const googleMapScript = document.createElement('SCRIPT');
-      googleMapScript.setAttribute('src', 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
-      googleMapScript.setAttribute('async', '');
-      googleMapScript.setAttribute('defer', '');
-      document.body.appendChild(googleMapScript);
+      this.initOpenLayers();
     },
     beforeDestroy() {
-
+      this.olmap.setTarget(null);
+      this.olmap = null;
     },
   };
 </script>
 
 <style lang="less">
+  .maps {
+    height: 100%;
+    position: relative;
+  }
   #pano {
     width: 100%;
     height: 100%;
-    min-height: 500px;
-    min-width: 500px;
-    float: left;
+  }
+  #map {
+    position: absolute;
+    height: 200px;
+    width: 200px;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    background-color: #ccc;
   }
 </style>
