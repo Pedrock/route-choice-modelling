@@ -47,7 +47,7 @@
             <el-input-number v-model="form.experience" :min="0" :max="90"></el-input-number>
           </el-form-item>
           <el-form-item>
-            <el-button native-type="submit" type="primary" class="next-button" @click="incrementStep">Next</el-button>
+            <el-button native-type="submit" type="primary" class="next-button">Next</el-button>
           </el-form-item>
         </el-form>
       </el-row>
@@ -57,20 +57,12 @@
 
 <script>
   import { mapMutations } from 'vuex';
-  import { INCREMENT_STEP } from '../store/mutation-types';
+  import { SUBMIT_ENTRY_FORM } from '../store/mutation-types';
 
   export default {
     data() {
       return {
         form: {
-          name: '',
-          region: '',
-          date1: '',
-          date2: '',
-          delivery: false,
-          type: [],
-          resource: '',
-          desc: '',
           age: 18,
           experience: 0,
           gender: '',
@@ -133,10 +125,11 @@
     },
     methods: {
       ...mapMutations({
-        incrementStep: INCREMENT_STEP,
+        submitForm: SUBMIT_ENTRY_FORM,
       }),
       onSubmit() {
-        console.log('submit!');
+        console.log('submit');
+        this.submitForm(this.form);
       },
     },
   };
@@ -150,5 +143,11 @@
   .next-button {
     right: 0;
     position: absolute;
+  }
+</style>
+
+<style lang="less">
+  .el-form-item__content {
+    line-height: 0;
   }
 </style>
