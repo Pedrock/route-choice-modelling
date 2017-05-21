@@ -92,6 +92,13 @@
         this.pano.addListener('pov_changed', () => {
           this.heading = (Math.PI * this.pano.getPov().heading) / 180;
         });
+
+        this.pano.addListener('status_changed', () => {
+          const div = document.querySelector('div[jstcache="0"][style="width: 100%; height: 100%;"]');
+          if (div) {
+            div.removeEventListener('keydown');
+          }
+        });
       },
       initOpenLayers() {
         this.olmap = new ol.Map({
