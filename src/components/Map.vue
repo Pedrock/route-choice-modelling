@@ -16,7 +16,6 @@
       width: 6, color: [200, 50, 50, 0.8],
     }),
   });
-
   const routeHoverStyle = new ol.style.Style({
     stroke: new ol.style.Stroke({
       width: 6, color: [0, 255, 0, 0.8],
@@ -70,11 +69,19 @@
         const { lat, lng } = this.location;
         return [lng, lat];
       },
+      pov() {
+        const heading = this.edgepoint ? this.edgepoint.location.heading : 0;
+        return {
+          heading: (180 * heading || 0) / Math.PI,
+          pitch: 0,
+        };
+      },
     },
     methods: {
       vueGoogleMapsInit() {
         this.pano = new window.google.maps.StreetViewPanorama(this.$refs.pano, {
           position: this.location,
+          pov: this.pov,
           zoom: 1,
           linksControl: false,
           enableCloseButton: false,
@@ -131,7 +138,6 @@
         if (e.selected[0]) {
           const edge = e.selected[0].getId();
           this.axios.get(`forward?edge=${edge}`).then((res) => {
-            console.log(res.data);
             this.edgepoint = res.data;
           }).catch(() => {
             const notification = {
@@ -151,6 +157,7 @@
         handler: function handler() {
           if (this.pano) {
             this.pano.setPosition(this.location);
+            this.pano.setPov(this.pov);
           }
           this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
           this.updatePolylines();
