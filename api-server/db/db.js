@@ -12,27 +12,38 @@ const knex = require('knex')({
   },
 });
 
-module.exports.goForward = function goForward(edgeId) {
+function auxGetChoices(edgepointQuery) {
   return knex
-  .select(knex.raw('toedgeid AS edge, ST_AsEncodedPolyline(geometry) AS polyline, ' +
-    'edgepoint, points.latitude, points.longitude'))
-  .from(knex.raw('getNextEdgePoint(?) AS edgepoint', edgeId))
-  .leftJoin('edgepoints', 'edgepoints.id', 'edgepoint')
-  .leftJoin('points', 'pointid', 'points.id')
+  .select(knex.raw('toedgeid AS id, ST_AsEncodedPolyline(geometry) AS polyline, ' +
+    'edgepoint, latitude AS lat, longitude AS lng'))
+  .from(edgepointQuery)
+  .join('edgepoints', 'edgepoints.id', 'edgepoint')
+  .join('points', 'pointid', 'points.id')
   .leftJoin('connections', function leftJoin() {
     this.on('fromedgeid', '=', 'edgepoints.edgeid').andOn(knex.raw('allow = 1'));
   })
   .leftJoin('edges', 'edges.id', 'toedgeid')
   .groupBy('toedgeid', 'edgepoint', 'latitude', 'longitude', 'geometry')
   .then((rows) => {
-    const { edgepoint, latitude, longitude } = rows[0];
-    const point = { edgepoint, latitude, longitude };
+    if (rows.length === 0) {
+      throw new Error('Point not found');
+    }
+    const { edgepoint, lat, lng } = rows[0];
+    const location = { edgepoint, lat, lng };
     const edges = rows[0].edge === null
       ? []
       : rows.map((row) => {
-        const { edge, polyline } = row;
-        return { edge, polyline };
+        const { id, polyline } = row;
+        return { id, polyline };
       });
-    return Object.assign(point, { edges });
+    return { location, edges };
   });
+}
+
+module.exports.goForward = function goForward(edgeId) {
+  return auxGetChoices(knex.raw('getNextEdgePoint(?) AS edgepoint', edgeId));
+};
+
+module.exports.getEdgePoint = function goForward(edgepoint) {
+  return auxGetChoices(knex.raw('(SELECT ?::integer AS edgepoint) aux', edgepoint));
 };
