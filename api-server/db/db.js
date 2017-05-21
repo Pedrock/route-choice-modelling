@@ -18,6 +18,7 @@ function auxGetChoices(edgepointQuery) {
       knex.raw('ST_AsEncodedPolyline(edges.geometry) AS polyline'),
       'edgepoint',
       knex.raw('getEdgeFinalHeading(curr_edge.id) AS heading'),
+      knex.raw('ST_AsEncodedPolyline(curr_edge.geometry) AS curr_polyline'),
       knex.raw('CASE WHEN ST_Length(curr_edge.geometry, true) <= 7.5' +
         ' THEN 0' +
         ' ELSE (ST_Length(curr_edge.geometry, true) - 7.5) / ST_Length(curr_edge.geometry, true) END' +
@@ -36,10 +37,7 @@ function auxGetChoices(edgepointQuery) {
   }
 
   return knex
-  .select('id',
-    'polyline',
-    'edgepoint',
-    'heading',
+  .select('*',
     knex.raw('ST_Y(ST_LineInterpolatePoint(curr_geom, fraction)) AS lat'),
     knex.raw('ST_X(ST_LineInterpolatePoint(curr_geom, fraction)) AS lng'))
   .from(subQuery)
@@ -47,8 +45,8 @@ function auxGetChoices(edgepointQuery) {
     if (rows.length === 0) {
       throw new Error('Point not found');
     }
-    const { edgepoint, lat, lng, heading } = rows[0];
-    const location = { edgepoint, lat, lng, heading };
+    const { edgepoint, lat, lng, heading, curr_polyline } = rows[0];
+    const location = { edgepoint, lat, lng, heading, polyline: curr_polyline };
     const edges = rows[0].edge === null
       ? []
       : rows.map((row) => {
