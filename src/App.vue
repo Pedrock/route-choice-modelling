@@ -1,5 +1,6 @@
 <template>
   <div id="app">
+    <vue-progress-bar></vue-progress-bar>
     <nav>
       <router-link :to="{name: 'entry'}">Root</router-link>
       <router-link :to="{name: 'map'}">Map</router-link>
@@ -23,6 +24,25 @@
 
   export default {
     name: 'app',
+    mounted() {
+      this.$Progress.finish();
+    },
+    created() {
+      this.$Progress.start();
+      this.$router.beforeEach((to, from, next) => {
+        if (to.meta.progress !== undefined) {
+          this.$Progress.parseMeta(to.meta.progress);
+        }
+        this.$Progress.start();
+        next();
+      });
+      this.$router.afterEach(() => {
+        this.$Progress.finish();
+      });
+      this.$router.onError(() => {
+        this.$Progress.fail();
+      });
+    },
     computed: {
       ...mapGetters([
         'step',

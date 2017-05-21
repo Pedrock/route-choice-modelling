@@ -73,7 +73,7 @@
           value: 'aveiro',
           label: 'Aveiro',
         }, {
-          value: 'beja',
+          value: 'braga',
           label: 'Braga',
         }, {
           value: 'braganca',

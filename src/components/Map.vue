@@ -7,6 +7,44 @@
 
 <script>
   import ol from 'openlayers';
+  import Vue from 'vue';
+
+  const initialEdgepoint = 1664600;
+
+  const routeStyle = new ol.style.Style({
+    stroke: new ol.style.Stroke({
+      width: 6, color: [200, 50, 50, 0.8],
+    }),
+  });
+
+  const routeHoverStyle = new ol.style.Style({
+    stroke: new ol.style.Stroke({
+      width: 6, color: [0, 255, 0, 0.8],
+    }),
+  });
+
+  const olHover = new ol.interaction.Select({
+    condition: ol.events.condition.pointerMove,
+    style: routeHoverStyle,
+  });
+  const olClick = new ol.interaction.Select({ condition: ol.events.condition.doubleClick });
+
+  const getData = (edgepoint, next) =>
+    Vue.axios.get(`edgepoint?id=${edgepoint}`)
+    .then((res) => {
+      next((vm) => {
+        // eslint-disable-next-line no-param-reassign
+        vm.edgepoint = res.data;
+      });
+    }).catch(() => {
+      next((vm) => {
+        const notification = {
+          title: 'An error occurred!',
+          message: 'Please try again later.',
+        };
+        vm.$notify.error(notification);
+      });
+    });
 
   export default {
     name: 'map',
@@ -14,11 +52,20 @@
       return {
         pano: null,
         olmap: null,
-        location: { lat: 41.177246, lng: -8.596743 },
         heading: 0,
+        edgepoint: null,
       };
     },
     computed: {
+      location() {
+        if (!this.edgepoint) {
+          return { lat: 0, lng: 0 };
+        }
+        return {
+          lat: Number(this.edgepoint.location.lat),
+          lng: Number(this.edgepoint.location.lng),
+        };
+      },
       openlayersLocation() {
         const { lat, lng } = this.location;
         return [lng, lat];
@@ -50,14 +97,65 @@
           ],
           view: new ol.View({
             center: ol.proj.fromLonLat(this.openlayersLocation),
-            zoom: 16,
+            zoom: 17,
+            minZoom: 17,
+            maxZoom: 17,
+          }),
+          interactions: ol.interaction.defaults({
+            dragPan: false,
           }),
         });
+        this.vectorSource = new ol.source.Vector();
+        this.olmap.addLayer(new ol.layer.Vector({
+          source: this.vectorSource,
+          style: routeStyle,
+        }));
+        olClick.on('select', this.onRouteClick.bind(this));
+      },
+      updatePolylines() {
+        this.vectorSource.clear();
+        this.edgepoint.edges.forEach((edge) => {
+          const format = new ol.format.Polyline();
+          const line = format.readGeometry(edge.polyline.replace(/\\\\/g, '\\'), {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857',
+          });
+          const feature = new ol.Feature({ geometry: line });
+          feature.setId(edge.id);
+          this.vectorSource.addFeature(feature);
+          this.olmap.addInteraction(olHover);
+          this.olmap.addInteraction(olClick);
+        });
+      },
+      onRouteClick(e) {
+        if (e.selected[0]) {
+          const edge = e.selected[0].getId();
+          this.axios.get(`forward?edge=${edge}`).then((res) => {
+            console.log(res.data);
+            this.edgepoint = res.data;
+          }).catch(() => {
+            const notification = {
+              title: 'An error occurred!',
+              message: 'Please try again later.',
+            };
+            this.$notify.error(notification);
+          }).then(() => {
+            olHover.getFeatures().clear();
+            olClick.getFeatures().clear();
+          });
+        }
       },
     },
     watch: {
-      location() {
-        this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+      location: {
+        handler: function handler() {
+          if (this.pano) {
+            this.pano.setPosition(this.location);
+          }
+          this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+          this.updatePolylines();
+        },
+        deep: true,
       },
       heading() {
         this.olmap.getView().setRotation(-this.heading);
@@ -69,7 +167,8 @@
       } else {
         window.vueGoogleMapsInit = this.vueGoogleMapsInit;
         const googleMapScript = document.createElement('SCRIPT');
-        googleMapScript.setAttribute('src', 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
+        googleMapScript.setAttribute('src',
+          'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
         googleMapScript.setAttribute('async', '');
         googleMapScript.setAttribute('defer', '');
         document.body.appendChild(googleMapScript);
@@ -77,8 +176,16 @@
       this.initOpenLayers();
     },
     beforeDestroy() {
-      this.olmap.setTarget(null);
-      this.olmap = null;
+      if (this.olmap) {
+        this.olmap.setTarget(null);
+        this.olmap = null;
+      }
+    },
+    beforeRouteEnter(to, from, next) {
+      getData(initialEdgepoint, next);
+    },
+    beforeRouteUpdate(to, from, next) {
+      getData(initialEdgepoint, next);
     },
   };
 </script>
