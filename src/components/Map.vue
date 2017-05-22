@@ -9,7 +9,25 @@
   import ol from 'openlayers';
   import Vue from 'vue';
 
-  const initialEdgepoint = 1664600;
+  ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
+    return new Promise((resolve) => {
+      const fullRotation = 2 * Math.PI;
+      const halfRotation = Math.PI;
+      const a = desiredRotation - this.getRotation() + halfRotation;
+      const mod = (a % fullRotation + fullRotation) % fullRotation - halfRotation;
+      const shortestRotationValue = this.getRotation() + mod;
+      this.animate({
+        rotation: shortestRotationValue,
+      }, () => {
+        Vue.nextTick(() => {
+          this.setRotation(((2 * Math.PI) + (this.getRotation() % (2 * Math.PI))) % (2 * Math.PI));
+        });
+        resolve();
+      });
+    });
+  };
+
+  const initialEdgepoint = 1656389;
 
   const routeStyle = new ol.style.Style({
     stroke: new ol.style.Stroke({
@@ -31,8 +49,10 @@
     Vue.axios.get(`edgepoint?id=${edgepoint}`)
     .then((res) => {
       next((vm) => {
+        vm.olmap.getView().setRotation(-res.data.location.heading);
         // eslint-disable-next-line no-param-reassign
         vm.edgepoint = res.data;
+        vm.olmap.getView().setCenter(ol.proj.fromLonLat(vm.openlayersLocation));
       });
     }).catch(() => {
       next((vm) => {
@@ -52,6 +72,7 @@
         olmap: null,
         heading: 0,
         edgepoint: null,
+        rotating: false,
       };
     },
     computed: {
@@ -113,6 +134,7 @@
             zoom: 17,
             minZoom: 17,
             maxZoom: 17,
+            rotation: 0,
           }),
           interactions: ol.interaction.defaults({
             dragPan: false,
@@ -171,6 +193,11 @@
           const edge = e.selected[0].getId();
           this.axios.get(`forward?edge=${edge}`).then((res) => {
             this.edgepoint = res.data;
+            this.rotating = true;
+            this.olmap.getView().rotateSmooth(-this.edgepoint.location.heading)
+            .then(() => {
+              this.rotating = false;
+            });
           }).catch(() => {
             const notification = {
               title: 'An error occurred!',
@@ -191,13 +218,17 @@
             this.pano.setPosition(this.location);
             this.pano.setPov(this.pov);
           }
-          this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+          setTimeout(() => {
+            this.olmap.getView().animate({ center: ol.proj.fromLonLat(this.openlayersLocation) });
+          });
           this.updatePolylines();
         },
         deep: true,
       },
       heading() {
-        this.olmap.getView().setRotation(-this.heading);
+        if (!this.rotating) {
+          this.olmap.getView().setRotation(-this.heading);
+        }
       },
     },
     mounted() {

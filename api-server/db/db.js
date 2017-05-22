@@ -19,9 +19,9 @@ function auxGetChoices(edgepointQuery) {
       'edgepoint',
       knex.raw('getEdgeFinalHeading(curr_edge.id) AS heading'),
       knex.raw('ST_AsEncodedPolyline(curr_edge.geometry) AS curr_polyline'),
-      knex.raw('CASE WHEN ST_Length(curr_edge.geometry, true) <= 7.5' +
+      knex.raw('CASE WHEN ST_Length(curr_edge.geometry, true) <= 8' +
         ' THEN 0' +
-        ' ELSE (ST_Length(curr_edge.geometry, true) - 7.5) / ST_Length(curr_edge.geometry, true) END' +
+        ' ELSE (ST_Length(curr_edge.geometry, true) - 8) / ST_Length(curr_edge.geometry, true) END' +
         ' AS fraction'),
       'curr_edge.geometry AS curr_geom')
     .from(edgepointQuery)
