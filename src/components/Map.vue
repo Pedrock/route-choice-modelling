@@ -16,18 +16,16 @@
       width: 6, color: [200, 50, 50, 0.8],
     }),
   });
-
   const routeHoverStyle = new ol.style.Style({
     stroke: new ol.style.Stroke({
       width: 6, color: [0, 255, 0, 0.8],
     }),
   });
-
-  const olHover = new ol.interaction.Select({
-    condition: ol.events.condition.pointerMove,
-    style: routeHoverStyle,
+  const currentEdgeStyle = new ol.style.Style({
+    stroke: new ol.style.Stroke({
+      width: 6, color: [200, 200, 0, 0.8],
+    }),
   });
-  const olClick = new ol.interaction.Select({ condition: ol.events.condition.doubleClick });
 
   const getData = (edgepoint, next) =>
     Vue.axios.get(`edgepoint?id=${edgepoint}`)
@@ -70,11 +68,19 @@
         const { lat, lng } = this.location;
         return [lng, lat];
       },
+      pov() {
+        const heading = this.edgepoint ? this.edgepoint.location.heading : 0;
+        return {
+          heading: (180 * heading || 0) / Math.PI,
+          pitch: 0,
+        };
+      },
     },
     methods: {
       vueGoogleMapsInit() {
         this.pano = new window.google.maps.StreetViewPanorama(this.$refs.pano, {
           position: this.location,
+          pov: this.pov,
           zoom: 1,
           linksControl: false,
           enableCloseButton: false,
@@ -84,6 +90,13 @@
 
         this.pano.addListener('pov_changed', () => {
           this.heading = (Math.PI * this.pano.getPov().heading) / 180;
+        });
+
+        this.pano.addListener('status_changed', () => {
+          const div = document.querySelector('div[jstcache="0"][style="width: 100%; height: 100%;"]');
+          if (div) {
+            div.removeEventListener('keydown');
+          }
         });
       },
       initOpenLayers() {
@@ -105,33 +118,58 @@
             dragPan: false,
           }),
         });
+        this.currentEdgeSource = new ol.source.Vector();
+        const currentEdgeLayer = new ol.layer.Vector({
+          source: this.currentEdgeSource,
+          style: currentEdgeStyle,
+        });
+        this.olmap.addLayer(currentEdgeLayer);
+
         this.vectorSource = new ol.source.Vector();
-        this.olmap.addLayer(new ol.layer.Vector({
+        this.vectorLayer = new ol.layer.Vector({
           source: this.vectorSource,
           style: routeStyle,
-        }));
-        olClick.on('select', this.onRouteClick.bind(this));
+        });
+        this.olmap.addLayer(this.vectorLayer);
+
+        this.olHover = new ol.interaction.Select({
+          condition: ol.events.condition.pointerMove,
+          style: routeHoverStyle,
+          layers: [this.vectorLayer],
+        });
+        this.olClick = new ol.interaction.Select({
+          condition: ol.events.condition.doubleClick,
+          layers: [this.vectorLayer],
+        });
+        this.olmap.addInteraction(this.olHover);
+        this.olmap.addInteraction(this.olClick);
+        this.olClick.on('select', this.onRouteClick.bind(this));
       },
       updatePolylines() {
         this.vectorSource.clear();
+        this.currentEdgeSource.clear();
+
+        const currentEdge = this.createPolylineFeature(this.edgepoint.location.polyline);
+        this.currentEdgeSource.addFeature(currentEdge);
+
         this.edgepoint.edges.forEach((edge) => {
-          const format = new ol.format.Polyline();
-          const line = format.readGeometry(edge.polyline.replace(/\\\\/g, '\\'), {
-            dataProjection: 'EPSG:4326',
-            featureProjection: 'EPSG:3857',
-          });
-          const feature = new ol.Feature({ geometry: line });
+          const feature = this.createPolylineFeature(edge.polyline);
           feature.setId(edge.id);
           this.vectorSource.addFeature(feature);
-          this.olmap.addInteraction(olHover);
-          this.olmap.addInteraction(olClick);
         });
+      },
+      createPolylineFeature(polyline) {
+        const format = new ol.format.Polyline();
+        const line = format.readGeometry(polyline.replace(/\\\\/g, '\\'), {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857',
+        });
+        return new ol.Feature({ geometry: line });
       },
       onRouteClick(e) {
         if (e.selected[0]) {
           const edge = e.selected[0].getId();
           this.axios.get(`forward?edge=${edge}`).then((res) => {
-            console.log(res.data);
             this.edgepoint = res.data;
           }).catch(() => {
             const notification = {
@@ -140,8 +178,8 @@
             };
             this.$notify.error(notification);
           }).then(() => {
-            olHover.getFeatures().clear();
-            olClick.getFeatures().clear();
+            this.olHover.getFeatures().clear();
+            this.olClick.getFeatures().clear();
           });
         }
       },
@@ -151,6 +189,7 @@
         handler: function handler() {
           if (this.pano) {
             this.pano.setPosition(this.location);
+            this.pano.setPov(this.pov);
           }
           this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
           this.updatePolylines();

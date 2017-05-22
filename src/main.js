@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 // The Vue build version to load with the `import` command
 // (runtime-only or standalone) has been set in webpack.base.conf with an alias.
 import 'element-ui/lib/theme-default/index.css';
@@ -32,3 +31,39 @@ new Vue({
   render: h => h(App),
   components: { App },
 });
+
+
+EventTarget.prototype.addEventListenerBase = EventTarget.prototype.addEventListener;
+EventTarget.prototype.addEventListener = function addEventListener(type, listener, ...args) {
+  if (!this.EventList) { this.EventList = []; }
+  this.addEventListenerBase(type, listener, ...args);
+  if (!this.EventList[type]) { this.EventList[type] = []; }
+  const list = this.EventList[type];
+  for (let index = 0; index < list.length; index++) {
+    if (list[index] === listener) { return; }
+  }
+  list.push(listener);
+};
+
+EventTarget.prototype.removeEventListenerBase = EventTarget.prototype.removeEventListener;
+EventTarget.prototype.removeEventListener = function removeEventListener(type, listener, ...args) {
+  if (!this.EventList) { this.EventList = []; }
+  if (listener instanceof Function) { this.removeEventListenerBase(type, listener, ...args); }
+  if (!this.EventList[type]) { return; }
+  const list = this.EventList[type];
+  for (let index = 0; index < list.length;) {
+    const item = list[index];
+    if (!listener) {
+      this.removeEventListenerBase(type, item);
+      list.splice(index, 1);
+    } else if (item === listener) {
+      list.splice(index, 1);
+      break;
+    } else {
+      index++;
+    }
+  }
+  if (list.length === 0) {
+    delete this.EventList[type];
+  }
+};

@@ -23,3 +23,10 @@ module.exports = () => {
   app.use(errorHandler);
   return app;
 };
+
+if (require.main === module) {
+  const config = require('../config');
+  const apiPort = process.env.API_PORT || config.dev.api_port;
+  console.log('Listening at port', apiPort);
+  module.exports().listen(apiPort);
+}

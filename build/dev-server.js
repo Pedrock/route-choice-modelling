@@ -88,7 +88,7 @@ devMiddleware.waitUntilValid(() => {
   _resolve()
 })
 
-var api = require('../api-server/api_server')().listen(apiPort)
+var api = require('../api-server/api-server')().listen(apiPort)
 
 var server = app.listen(port)
 

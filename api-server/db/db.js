@@ -13,23 +13,40 @@ const knex = require('knex')({
 });
 
 function auxGetChoices(edgepointQuery) {
+  function subQuery() {
+    this.select('toedgeid AS id',
+      knex.raw('ST_AsEncodedPolyline(edges.geometry) AS polyline'),
+      'edgepoint',
+      knex.raw('getEdgeFinalHeading(curr_edge.id) AS heading'),
+      knex.raw('ST_AsEncodedPolyline(curr_edge.geometry) AS curr_polyline'),
+      knex.raw('CASE WHEN ST_Length(curr_edge.geometry, true) <= 7.5' +
+        ' THEN 0' +
+        ' ELSE (ST_Length(curr_edge.geometry, true) - 7.5) / ST_Length(curr_edge.geometry, true) END' +
+        ' AS fraction'),
+      'curr_edge.geometry AS curr_geom')
+    .from(edgepointQuery)
+    .join('edgepoints', 'edgepoints.id', 'edgepoint')
+    .join('points', 'pointid', 'points.id')
+    .join('edges AS curr_edge', 'curr_edge.id', 'edgeid')
+    .leftJoin('connections', function leftJoin() {
+      this.on('fromedgeid', '=', 'edgepoints.edgeid').andOn(knex.raw('allow = 1'));
+    })
+    .leftJoin('edges', 'edges.id', 'toedgeid')
+    .groupBy('toedgeid', 'edgepoint', 'latitude', 'longitude', 'edges.geometry', 'curr_edge.geometry', 'curr_edge.id')
+    .as('aux');
+  }
+
   return knex
-  .select(knex.raw('toedgeid AS id, ST_AsEncodedPolyline(geometry) AS polyline, ' +
-    'edgepoint, latitude AS lat, longitude AS lng'))
-  .from(edgepointQuery)
-  .join('edgepoints', 'edgepoints.id', 'edgepoint')
-  .join('points', 'pointid', 'points.id')
-  .leftJoin('connections', function leftJoin() {
-    this.on('fromedgeid', '=', 'edgepoints.edgeid').andOn(knex.raw('allow = 1'));
-  })
-  .leftJoin('edges', 'edges.id', 'toedgeid')
-  .groupBy('toedgeid', 'edgepoint', 'latitude', 'longitude', 'geometry')
+  .select('*',
+    knex.raw('ST_Y(ST_LineInterpolatePoint(curr_geom, fraction)) AS lat'),
+    knex.raw('ST_X(ST_LineInterpolatePoint(curr_geom, fraction)) AS lng'))
+  .from(subQuery)
   .then((rows) => {
     if (rows.length === 0) {
       throw new Error('Point not found');
     }
-    const { edgepoint, lat, lng } = rows[0];
-    const location = { edgepoint, lat, lng };
+    const { edgepoint, lat, lng, heading, curr_polyline } = rows[0];
+    const location = { edgepoint, lat, lng, heading, polyline: curr_polyline };
     const edges = rows[0].edge === null
       ? []
       : rows.map((row) => {
