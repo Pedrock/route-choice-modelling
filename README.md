@@ -1,6 +1,12 @@
 # mssi
 
-> Projeto de MSSI
+> Driving simulation with OpenStreetMaps and Google StreetView
+
+## Environment Setup
+
+Install PostgreSQL + Postgis. Import the database.sql dump file present in the database_sql directory of this project.
+
+Copy the .env.example file to .env and edit it according to your database setup.
 
 ## Build Setup
 
