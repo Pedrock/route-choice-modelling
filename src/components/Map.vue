@@ -9,7 +9,25 @@
   import ol from 'openlayers';
   import Vue from 'vue';
 
-  const initialEdgepoint = 1664600;
+  ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
+    return new Promise((resolve) => {
+      const fullRotation = 2 * Math.PI;
+      const halfRotation = Math.PI;
+      const a = desiredRotation - this.getRotation() + halfRotation;
+      const mod = (a % fullRotation + fullRotation) % fullRotation - halfRotation;
+      const shortestRotationValue = this.getRotation() + mod;
+      this.animate({
+        rotation: shortestRotationValue,
+      }, () => {
+        Vue.nextTick(() => {
+          this.setRotation(((2 * Math.PI) + (this.getRotation() % (2 * Math.PI))) % (2 * Math.PI));
+        });
+        resolve();
+      });
+    });
+  };
+
+  const initialEdge = -1071423;
 
   const routeStyle = new ol.style.Style({
     stroke: new ol.style.Stroke({
@@ -27,12 +45,14 @@
     }),
   });
 
-  const getData = (edgepoint, next) =>
-    Vue.axios.get(`edgepoint?id=${edgepoint}`)
+  const getData = (edge, next) =>
+    Vue.axios.get(`edge?id=${edge}`)
     .then((res) => {
       next((vm) => {
+        vm.olmap.getView().setRotation(-res.data.location.heading);
         // eslint-disable-next-line no-param-reassign
-        vm.edgepoint = res.data;
+        vm.data = res.data;
+        vm.olmap.getView().setCenter(ol.proj.fromLonLat(vm.openlayersLocation));
       });
     }).catch(() => {
       next((vm) => {
@@ -51,17 +71,18 @@
         pano: null,
         olmap: null,
         heading: 0,
-        edgepoint: null,
+        data: null,
+        rotating: false,
       };
     },
     computed: {
       location() {
-        if (!this.edgepoint) {
+        if (!this.data) {
           return { lat: 0, lng: 0 };
         }
         return {
-          lat: Number(this.edgepoint.location.lat),
-          lng: Number(this.edgepoint.location.lng),
+          lat: Number(this.data.location.lat),
+          lng: Number(this.data.location.lng),
         };
       },
       openlayersLocation() {
@@ -69,7 +90,7 @@
         return [lng, lat];
       },
       pov() {
-        const heading = this.edgepoint ? this.edgepoint.location.heading : 0;
+        const heading = this.data ? this.data.location.heading : 0;
         return {
           heading: (180 * heading || 0) / Math.PI,
           pitch: 0,
@@ -113,6 +134,7 @@
             zoom: 17,
             minZoom: 17,
             maxZoom: 17,
+            rotation: 0,
           }),
           interactions: ol.interaction.defaults({
             dragPan: false,
@@ -149,10 +171,10 @@
         this.vectorSource.clear();
         this.currentEdgeSource.clear();
 
-        const currentEdge = this.createPolylineFeature(this.edgepoint.location.polyline);
+        const currentEdge = this.createPolylineFeature(this.data.location.polyline);
         this.currentEdgeSource.addFeature(currentEdge);
 
-        this.edgepoint.edges.forEach((edge) => {
+        this.data.edges.forEach((edge) => {
           const feature = this.createPolylineFeature(edge.polyline);
           feature.setId(edge.id);
           this.vectorSource.addFeature(feature);
@@ -170,7 +192,12 @@
         if (e.selected[0]) {
           const edge = e.selected[0].getId();
           this.axios.get(`forward?edge=${edge}`).then((res) => {
-            this.edgepoint = res.data;
+            this.data = res.data;
+            this.rotating = true;
+            this.olmap.getView().rotateSmooth(-this.data.location.heading)
+            .then(() => {
+              this.rotating = false;
+            });
           }).catch(() => {
             const notification = {
               title: 'An error occurred!',
@@ -191,13 +218,17 @@
             this.pano.setPosition(this.location);
             this.pano.setPov(this.pov);
           }
-          this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+          setTimeout(() => {
+            this.olmap.getView().animate({ center: ol.proj.fromLonLat(this.openlayersLocation) });
+          });
           this.updatePolylines();
         },
         deep: true,
       },
       heading() {
-        this.olmap.getView().setRotation(-this.heading);
+        if (!this.rotating) {
+          this.olmap.getView().setRotation(-this.heading);
+        }
       },
     },
     mounted() {
@@ -221,10 +252,10 @@
       }
     },
     beforeRouteEnter(to, from, next) {
-      getData(initialEdgepoint, next);
+      getData(initialEdge, next);
     },
     beforeRouteUpdate(to, from, next) {
-      getData(initialEdgepoint, next);
+      getData(initialEdge, next);
     },
   };
 </script>

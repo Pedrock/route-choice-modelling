@@ -4,6 +4,6 @@ const express = require('express');
 const router = express.Router();
 
 router.use('/forward', require('./forward'));
-router.use('/edgepoint', require('./edgepoint'));
+router.use('/edge', require('./edge'));
 
 module.exports = router;
