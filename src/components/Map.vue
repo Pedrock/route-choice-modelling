@@ -68,11 +68,10 @@
     name: 'map',
     data() {
       return {
-        pano: null,
-        olmap: null,
         heading: 0,
         data: null,
         rotating: false,
+        path: [],
       };
     },
     computed: {
@@ -114,7 +113,7 @@
         });
 
         this.pano.addListener('status_changed', () => {
-          const div = document.querySelector('div[jstcache="0"][style="width: 100%; height: 100%;"]');
+          const div = document.querySelector('.gm-style > div > div > div[jstcache="0"]');
           if (div) {
             div.removeEventListener('keydown');
           }
@@ -194,6 +193,8 @@
           this.axios.get(`forward?edge=${edge}`).then((res) => {
             this.data = res.data;
             this.rotating = true;
+            const path = res.data.location.path;
+            this.path = [...this.path, ...path];
             this.olmap.getView().rotateSmooth(-this.data.location.heading)
             .then(() => {
               this.rotating = false;

@@ -35,14 +35,16 @@ new Vue({
 
 EventTarget.prototype.addEventListenerBase = EventTarget.prototype.addEventListener;
 EventTarget.prototype.addEventListener = function addEventListener(type, listener, ...args) {
-  if (!this.EventList) { this.EventList = []; }
   this.addEventListenerBase(type, listener, ...args);
-  if (!this.EventList[type]) { this.EventList[type] = []; }
-  const list = this.EventList[type];
-  for (let index = 0; index < list.length; index++) {
-    if (list[index] === listener) { return; }
+  if (type === 'keydown') {
+    if (!this.EventList) { this.EventList = []; }
+    if (!this.EventList[type]) { this.EventList[type] = []; }
+    const list = this.EventList[type];
+    for (let index = 0; index < list.length; index++) {
+      if (list[index] === listener) { return; }
+    }
+    list.push(listener);
   }
-  list.push(listener);
 };
 
 EventTarget.prototype.removeEventListenerBase = EventTarget.prototype.removeEventListener;
