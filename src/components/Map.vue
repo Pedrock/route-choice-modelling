@@ -135,9 +135,7 @@
             maxZoom: 17,
             rotation: 0,
           }),
-          interactions: ol.interaction.defaults({
-            dragPan: false,
-          }),
+          interactions: [],
         });
         this.currentEdgeSource = new ol.source.Vector();
         const currentEdgeLayer = new ol.layer.Vector({
