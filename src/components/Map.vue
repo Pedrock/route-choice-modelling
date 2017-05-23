@@ -8,6 +8,8 @@
 <script>
   import ol from 'openlayers';
   import Vue from 'vue';
+  import { mapMutations } from 'vuex';
+  import { ADD_TO_PATH } from '../store/mutation-types';
 
   ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
     return new Promise((resolve) => {
@@ -71,7 +73,6 @@
         heading: 0,
         data: null,
         rotating: false,
-        path: [],
       };
     },
     computed: {
@@ -97,6 +98,9 @@
       },
     },
     methods: {
+      ...mapMutations({
+        addToPath: ADD_TO_PATH,
+      }),
       vueGoogleMapsInit() {
         this.pano = new window.google.maps.StreetViewPanorama(this.$refs.pano, {
           position: this.location,
@@ -191,8 +195,7 @@
           this.axios.get(`forward?edge=${edge}`).then((res) => {
             this.data = res.data;
             this.rotating = true;
-            const path = res.data.location.path;
-            this.path = [...this.path, ...path];
+            this.addToPath(res.data.location.path);
             this.olmap.getView().rotateSmooth(-this.data.location.heading)
             .then(() => {
               this.rotating = false;
