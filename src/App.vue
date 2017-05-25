@@ -1,16 +1,11 @@
 <template>
   <div id="app">
     <vue-progress-bar></vue-progress-bar>
-    <nav>
-      <router-link :to="{name: 'entry'}">Root</router-link>
-      <router-link :to="{name: 'map'}">Map</router-link>
-    </nav>
     <div id="steps">
-      <el-steps :active="step" finish-status="success" :center="true">
-        <el-step title="Entry Form"></el-step>
-        <el-step title="Driving without information"></el-step>
-        <el-step title="Driving with information"></el-step>
-        <el-step title="Final"></el-step>
+      <el-steps :active="step" :center="true">
+        <el-step title="Entry Form" icon="edit"></el-step>
+        <el-step :title="'Driving Simulation' + routeText"></el-step>
+        <el-step title="Thank you" icon="check"></el-step>
       </el-steps>
     </div>
     <div id="wrapper">
@@ -21,6 +16,12 @@
 
 <script>
   import { mapGetters } from 'vuex';
+
+  if (process.env.NODE_ENV === 'production') {
+    window.onbeforeunload = function onbeforeunload() {
+      return 'Leaving this page will reset everything.';
+    };
+  }
 
   export default {
     name: 'app',
@@ -46,7 +47,12 @@
     computed: {
       ...mapGetters([
         'step',
+        'currentRouteIndex',
+        'numberOfRoutes',
       ]),
+      routeText() {
+        return this.step !== 1 ? '' : ` (${this.currentRouteIndex + 1} / ${this.numberOfRoutes})`;
+      },
     },
   };
 </script>
@@ -70,6 +76,14 @@
   }
   #steps {
     padding: 20px 10% 10px;
+    .el-step__head.is-text.is-finish{
+      background-color: #fff;
+      border-color: #13ce66;
+    }
+    .el-step__head.is-finish, .el-step__title.is-finish {
+      color: #13ce66;
+      border-color: #13ce66;
+    }
   }
   #wrapper {
     flex: 1;

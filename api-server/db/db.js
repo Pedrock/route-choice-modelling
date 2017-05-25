@@ -62,3 +62,7 @@ module.exports.goForward = function goForward(edgeId) {
 module.exports.getEdgePoint = function goForward(edge) {
   return auxGetChoices(knex.raw('ARRAY[?]::integer[]', edge));
 };
+
+module.exports.storeData = function storeData(data) {
+  return Promise.resolve(data);
+};

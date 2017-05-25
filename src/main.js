@@ -32,7 +32,6 @@ new Vue({
   components: { App },
 });
 
-
 EventTarget.prototype.addEventListenerBase = EventTarget.prototype.addEventListener;
 EventTarget.prototype.addEventListener = function addEventListener(type, listener, ...args) {
   this.addEventListenerBase(type, listener, ...args);

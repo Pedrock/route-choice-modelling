@@ -57,7 +57,7 @@
 
 <script>
   import { mapMutations } from 'vuex';
-  import { SUBMIT_ENTRY_FORM } from '../store/mutation-types';
+  import { SUBMIT_ENTRY_FORM } from '@/store/mutation-types';
 
   export default {
     data() {
@@ -128,7 +128,6 @@
         submitForm: SUBMIT_ENTRY_FORM,
       }),
       onSubmit() {
-        console.log('submit');
         this.submitForm(this.form);
       },
     },

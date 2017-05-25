@@ -20,5 +20,10 @@ export default new Router({
       name: 'entry',
       component: Entry,
     },
+    {
+      path: '/thankyou',
+      name: 'thankyou',
+      component: Map,
+    },
   ],
 });

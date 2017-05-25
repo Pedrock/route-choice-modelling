@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import Vue from 'vue';
 import Vuex from 'vuex';
-import { ADD_TO_PATH, INCREMENT_STEP, SUBMIT_ENTRY_FORM } from './mutation-types';
+import { ADD_TO_PATH, INCREMENT_STEP, SUBMIT_ENTRY_FORM, NEXT_ROUTE, ADD_ANSWER } from './mutation-types';
 import router from '../router';
 
 Vue.use(Vuex);
@@ -12,19 +12,41 @@ export default new Vuex.Store({
     form: null,
     currentRoute: 0,
     routes: {},
-    tasks: [
-      { initialEdge: -1071423, finalEdge: 1054946 },
+    routesInfo: [
+      { help: false, initialEdge: -1071423, finalEdge: 1910834 },
+      { help: true, initialEdge: 1071423, finalEdge: -1071423 },
     ],
+    arrived: false,
   },
   getters: {
     step(state) {
       return state.step;
     },
+    currentRouteInfo(state) {
+      return state.routesInfo[state.currentRoute];
+    },
+    hasArrived(state) {
+      return state.arrived;
+    },
+    hasFinished(state) {
+      return state.step === 4;
+    },
+    route(state) {
+      return state.routes[state.currentRoute];
+    },
+    currentRouteIndex(state) {
+      return state.currentRoute;
+    },
+    numberOfRoutes(state) {
+      return state.routesInfo.length;
+    },
+    nextRouteInfo(state) {
+      return state.routesInfo[state.currentRoute + 1];
+    },
   },
   mutations: {
     [INCREMENT_STEP](state) {
       state.step++;
-      if (state.step > 4) state.step = 0;
     },
     [SUBMIT_ENTRY_FORM](state, form) {
       state.form = form;
@@ -32,10 +54,35 @@ export default new Vuex.Store({
       router.push({ path: '/map' });
     },
     [ADD_TO_PATH](state, path) {
+      const info = state.routesInfo[state.currentRoute];
       if (state.routes[state.currentRoute] === undefined) {
-        state.routes[state.currentRoute] = [];
+        state.routes[state.currentRoute] = { ...info, path: [] };
       }
-      state.routes[state.currentRoute].push(...path);
+      state.routes[state.currentRoute].path.push(...path);
+      if (path.includes(info.finalEdge)) {
+        state.arrived = true;
+      }
+    },
+    [NEXT_ROUTE](state) {
+      state.arrived = false;
+      if (state.currentRoute + 1 >= state.routesInfo.length) {
+        state.step = 4;
+        router.push({ path: '/thankyou' });
+      } else {
+        state.currentRoute++;
+      }
+    },
+    [ADD_ANSWER](state, numKnownRoutes) {
+      const route = state.routes[state.currentRoute];
+      route.numKnownRoutes = numKnownRoutes;
+    },
+  },
+  actions: {
+    sendAllInfo({ state }) {
+      return Vue.axios.post('store', {
+        routes: state.routes,
+        form: state.form,
+      });
     },
   },
   strict: process.env.NODE_ENV !== 'production',
