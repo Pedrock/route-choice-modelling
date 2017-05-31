@@ -12,6 +12,9 @@ export default new Vuex.Store({
     form: null,
     currentRoute: 0,
     routes: {},
+    tasks: [
+      { initialEdge: -1071423, finalEdge: 1054946 },
+    ],
   },
   getters: {
     step(state) {
