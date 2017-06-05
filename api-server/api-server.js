@@ -1,10 +1,9 @@
 'use strict';
 
-const dotenv = require('dotenv');
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
-
-dotenv.config();
 
 global.rootPath = () => __dirname;
 
