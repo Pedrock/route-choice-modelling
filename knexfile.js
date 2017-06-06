@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv-safe').load();
 
 module.exports = {
   client: 'postgresql',

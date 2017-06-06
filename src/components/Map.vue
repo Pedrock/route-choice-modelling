@@ -284,8 +284,9 @@
       } else {
         window.vueGoogleMapsInit = this.vueGoogleMapsInit;
         const googleMapScript = document.createElement('SCRIPT');
+        const gmapsKey = process.env.GMAPS_KEY;
         googleMapScript.setAttribute('src',
-          'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
+          `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&callback=vueGoogleMapsInit`);
         googleMapScript.setAttribute('async', '');
         googleMapScript.setAttribute('defer', '');
         document.body.appendChild(googleMapScript);
