@@ -2,20 +2,11 @@
 
 require('dotenv').config();
 
-const knex = require('knex')({
-  client: 'postgresql',
-  connection: {
-    host: process.env.DB_HOST || '127.0.0.1',
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-  },
-});
+const knex = require('knex')(require('../../knexfile'));
 
 knex.selectRaw = function selectRaw(...args) {
   return this.select(this.raw(...args));
 };
-
 
 function auxGetChoices(pathQuery) {
   return knex.selectRaw(`*,
@@ -70,4 +61,8 @@ module.exports.goForward = function goForward(edgeId) {
 
 module.exports.getEdgePoint = function goForward(edge) {
   return auxGetChoices(knex.raw('ARRAY[?]::integer[]', edge));
+};
+
+module.exports.storeData = function storeData(obj) {
+  return knex.selectRaw('insertCompletedSurvey(?)', JSON.stringify(obj));
 };

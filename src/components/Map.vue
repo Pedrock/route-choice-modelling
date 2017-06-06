@@ -1,13 +1,31 @@
 <template>
-  <div class="maps">
+  <div id="maps">
+    <div class="overlay" v-if="hasArrived">
+      <div>
+        <p class="overlay-title">You have arrived at the destination!</p>
+        <p>How many routes do you know from the starting point to this destination?</p>
+        <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
+        <el-button type="primary" :loading="loading" @click="nextClick">Next <i class="el-icon-arrow-right el-icon-right"></i></el-button>
+      </div>
+    </div>
+    <div class="overlay" v-if="hasFinished">
+      <div>
+        <p class="overlay-title">You are done! Thank you for your time!</p>
+      </div>
+    </div>
     <div id="pano" ref="pano"></div>
-    <div id="map" ref="map"></div>
+    <div id="map" ref="map" v-show="!this.hasFinished"></div>
   </div>
 </template>
 
 <script>
   import ol from 'openlayers';
   import Vue from 'vue';
+  import { mapActions, mapGetters, mapMutations } from 'vuex';
+  import store from '@/store/store';
+  import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
+  import LimitedNumberInput from './LimitedNumberInput';
+
 
   ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
     return new Promise((resolve) => {
@@ -27,35 +45,20 @@
     });
   };
 
-  const initialEdge = -1071423;
+  const createRouteStyle = color => new ol.style.Style({
+    stroke: new ol.style.Stroke({ width: 6, color }),
+  });
+  const routeStyle = createRouteStyle([200, 50, 50, 0.8]);
+  const routeHoverStyle = createRouteStyle([0, 255, 0, 0.8]);
+  const currentEdgeStyle = createRouteStyle([200, 200, 0, 0.8]);
 
-  const routeStyle = new ol.style.Style({
-    stroke: new ol.style.Stroke({
-      width: 6, color: [200, 50, 50, 0.8],
-    }),
-  });
-  const routeHoverStyle = new ol.style.Style({
-    stroke: new ol.style.Stroke({
-      width: 6, color: [0, 255, 0, 0.8],
-    }),
-  });
-  const currentEdgeStyle = new ol.style.Style({
-    stroke: new ol.style.Stroke({
-      width: 6, color: [200, 200, 0, 0.8],
-    }),
-  });
-
-  const getData = (edge, next) =>
+  const getData = (next) => {
+    const edge = store.getters.currentRouteInfo.initialEdge;
     Vue.axios.get(`edge?id=${edge}`)
-    .then((res) => {
+    .then(res => next(vm => vm.initialDataReceived(res.data)))
+    .catch((err) => {
       next((vm) => {
-        vm.olmap.getView().setRotation(-res.data.location.heading);
-        // eslint-disable-next-line no-param-reassign
-        vm.data = res.data;
-        vm.olmap.getView().setCenter(ol.proj.fromLonLat(vm.openlayersLocation));
-      });
-    }).catch(() => {
-      next((vm) => {
+        console.error(err);
         const notification = {
           title: 'An error occurred!',
           message: 'Please try again later.',
@@ -63,6 +66,7 @@
         vm.$notify.error(notification);
       });
     });
+  };
 
   export default {
     name: 'map',
@@ -71,10 +75,18 @@
         heading: 0,
         data: null,
         rotating: false,
-        path: [],
+        loading: false,
+        questionAnswer: null,
       };
     },
     computed: {
+      ...mapGetters([
+        'currentRouteInfo',
+        'hasArrived',
+        'hasFinished',
+        'nextRouteInfo',
+        'step',
+      ]),
       location() {
         if (!this.data) {
           return { lat: 0, lng: 0 };
@@ -97,6 +109,12 @@
       },
     },
     methods: {
+      ...mapMutations({
+        addToPath: ADD_TO_PATH,
+        nextRoute: NEXT_ROUTE,
+        addAnswer: ADD_ANSWER,
+      }),
+      ...mapActions(['sendAllInfo']),
       vueGoogleMapsInit() {
         this.pano = new window.google.maps.StreetViewPanorama(this.$refs.pano, {
           position: this.location,
@@ -185,19 +203,23 @@
         });
         return new ol.Feature({ geometry: line });
       },
+      initialDataReceived(data) {
+        this.olmap.getView().setRotation(-data.location.heading);
+        this.data = data;
+        this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
+      },
       onRouteClick(e) {
         if (e.selected[0]) {
           const edge = e.selected[0].getId();
           this.axios.get(`forward?edge=${edge}`).then((res) => {
             this.data = res.data;
             this.rotating = true;
-            const path = res.data.location.path;
-            this.path = [...this.path, ...path];
-            this.olmap.getView().rotateSmooth(-this.data.location.heading)
-            .then(() => {
+            this.addToPath(res.data.location.path);
+            this.olmap.getView().rotateSmooth(-this.data.location.heading).then(() => {
               this.rotating = false;
             });
-          }).catch(() => {
+          }).catch((err) => {
+            console.error(err);
             const notification = {
               title: 'An error occurred!',
               message: 'Please try again later.',
@@ -208,6 +230,30 @@
             this.olClick.getFeatures().clear();
           });
         }
+      },
+      nextClick() {
+        this.addAnswer(this.questionAnswer);
+        (() => {
+          if (this.nextRouteInfo) {
+            this.loading = true;
+            const edge = store.getters.nextRouteInfo.initialEdge;
+            return this.axios.get(`edge?id=${edge}`)
+            .then(res => this.initialDataReceived(res.data));
+          }
+          return this.sendAllInfo();
+        })().then(() => {
+          this.nextRoute();
+          this.loading = false;
+          this.questionAnswer = null;
+          this.olmap.renderSync();
+        }).catch((err) => {
+          console.error(err);
+          const notification = {
+            title: 'An error occurred!',
+            message: 'Please try again later.',
+          };
+          this.$notify.error(notification);
+        });
       },
     },
     watch: {
@@ -220,7 +266,9 @@
           setTimeout(() => {
             this.olmap.getView().animate({ center: ol.proj.fromLonLat(this.openlayersLocation) });
           });
-          this.updatePolylines();
+          if (!this.hasFinished) {
+            this.updatePolylines();
+          }
         },
         deep: true,
       },
@@ -251,30 +299,64 @@
       }
     },
     beforeRouteEnter(to, from, next) {
-      getData(initialEdge, next);
+      if (store.getters.step === 0) {
+        next({ name: 'entry' });
+      } else if (store.getters.step < 3) {
+        getData(next);
+      } else next();
     },
     beforeRouteUpdate(to, from, next) {
-      getData(initialEdge, next);
+      if (store.getters.step < 3) {
+        getData(next);
+      } else next();
     },
+    components: { LimitedNumberInput },
   };
 </script>
 
 <style lang="less">
-  .maps {
+  #maps {
     height: 100%;
     position: relative;
-  }
-  #pano {
-    width: 100%;
-    height: 100%;
-  }
-  #map {
-    position: absolute;
-    height: 200px;
-    width: 200px;
-    top: 0;
-    right: 0;
-    z-index: 1;
-    background-color: #ccc;
+
+    #pano, .overlay {
+      width: 100%;
+      height: 100%;
+    }
+
+    .overlay-title {
+      font-size: 2em;
+      margin-bottom: 50px;
+    }
+
+    .overlay {
+      position: absolute;
+      z-index: 3;
+      background-color: rgba(255, 255, 255, 0.7);
+      display: table;
+      > div {
+        display: table-cell;
+        vertical-align: middle;
+        text-align: center;
+        font-weight: bold;
+        padding-bottom: 1em;
+      }
+      .el-input-number {
+        display: block;
+        box-sizing: border-box;
+        max-width: 900px;
+        margin: 20px auto;
+      }
+    }
+
+    #map {
+      position: absolute;
+      height: 200px;
+      width: 200px;
+      top: 0;
+      right: 0;
+      z-index: 1;
+      background-color: #ccc;
+    }
   }
 </style>

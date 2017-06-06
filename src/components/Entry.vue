@@ -5,8 +5,8 @@
     </div>
     <div id="inicial-form">
       <el-row type="flex" class="row-bg" justify="center">
-        <el-form v-on:submit.native.prevent="onSubmit" ref="form" :model="form" label-width="200px">
-          <el-form-item label="Gender">
+        <el-form v-on:submit.native.prevent="onSubmit" ref="form" :model="form" :rules="rules" label-width="200px">
+          <el-form-item label="Gender" prop="gender">
             <el-select v-model="form.gender" placeholder="Select">
               <el-option
                 key="male"
@@ -20,7 +20,7 @@
               </el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="Place of birth (district)">
+          <el-form-item label="Place of birth (district)" prop="birth">
             <el-select v-model="form.birth" placeholder="Select">
               <el-option
                 v-for="item in options"
@@ -30,7 +30,7 @@
               </el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="Locality (district)">
+          <el-form-item label="Locality (district)" prop="locality">
             <el-select v-model="form.locality" placeholder="Select">
               <el-option
                 v-for="item in options"
@@ -40,10 +40,10 @@
               </el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="Age">
+          <el-form-item label="Age" prop="age">
             <el-input-number v-model="form.age" :min="18" :max="90"></el-input-number>
           </el-form-item>
-          <el-form-item label="Driving experience (Years)">
+          <el-form-item label="Driving experience (Years)" prop="experience">
             <el-input-number v-model="form.experience" :min="0" :max="90"></el-input-number>
           </el-form-item>
           <el-form-item>
@@ -57,7 +57,7 @@
 
 <script>
   import { mapMutations } from 'vuex';
-  import { SUBMIT_ENTRY_FORM } from '../store/mutation-types';
+  import { SUBMIT_ENTRY_FORM } from '@/store/mutation-types';
 
   export default {
     data() {
@@ -68,6 +68,13 @@
           gender: '',
           birth: '',
           locality: '',
+        },
+        rules: {
+          gender: { required: true, message: 'Please choose your gender.' },
+          birth: { required: true, message: 'Please choose your place of birth.' },
+          locality: { required: true, message: 'Please choose the locality where you live.' },
+          age: { required: true },
+          experience: { required: true },
         },
         options: [{
           value: 'aveiro',
@@ -128,8 +135,11 @@
         submitForm: SUBMIT_ENTRY_FORM,
       }),
       onSubmit() {
-        console.log('submit');
-        this.submitForm(this.form);
+        this.$refs.form.validate((valid) => {
+          if (valid) {
+            this.submitForm(this.form);
+          }
+        });
       },
     },
   };
@@ -149,5 +159,8 @@
 <style lang="less">
   .el-form-item__content {
     line-height: 0;
+  }
+  .el-form-item:not(:first-child) {
+    margin-top: 40px;
   }
 </style>
