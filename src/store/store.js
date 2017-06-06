@@ -11,7 +11,7 @@ export default new Vuex.Store({
     step: 0,
     form: null,
     currentRoute: 0,
-    routes: {},
+    routes: [],
     routesInfo: [
       { help: false, initialEdge: -1071423, finalEdge: 1910834 },
       { help: true, initialEdge: 1071423, finalEdge: -1071423 },
@@ -29,7 +29,7 @@ export default new Vuex.Store({
       return state.arrived;
     },
     hasFinished(state) {
-      return state.step === 4;
+      return state.step === 3;
     },
     route(state) {
       return state.routes[state.currentRoute];
@@ -51,7 +51,7 @@ export default new Vuex.Store({
     [SUBMIT_ENTRY_FORM](state, form) {
       state.form = form;
       state.step = 1;
-      router.push({ path: '/map' });
+      router.replace({ path: '/map' });
     },
     [ADD_TO_PATH](state, path) {
       const info = state.routesInfo[state.currentRoute];
@@ -66,8 +66,8 @@ export default new Vuex.Store({
     [NEXT_ROUTE](state) {
       state.arrived = false;
       if (state.currentRoute + 1 >= state.routesInfo.length) {
-        state.step = 4;
-        router.push({ path: '/thankyou' });
+        state.step = 3;
+        router.replace({ path: '/thankyou' });
       } else {
         state.currentRoute++;
       }

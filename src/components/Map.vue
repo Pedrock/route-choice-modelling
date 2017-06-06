@@ -14,7 +14,7 @@
       </div>
     </div>
     <div id="pano" ref="pano"></div>
-    <div id="map" ref="map"></div>
+    <div id="map" ref="map" v-show="!this.hasFinished"></div>
   </div>
 </template>
 
@@ -301,11 +301,14 @@
     beforeRouteEnter(to, from, next) {
       if (store.getters.step === 0) {
         next({ name: 'entry' });
-      }
-      getData(next);
+      } else if (store.getters.step < 3) {
+        getData(next);
+      } else next();
     },
     beforeRouteUpdate(to, from, next) {
-      getData(next);
+      if (store.getters.step < 3) {
+        getData(next);
+      } else next();
     },
     components: { LimitedNumberInput },
   };

@@ -10,9 +10,12 @@ router.post('/', (req, res, next) => {
     return;
   }
 
-  console.log(req.body);
+  const obj = {
+    form: req.body.form,
+    routes: req.body.routes,
+  };
 
-  db.storeData(req.body).then(() => {
+  db.storeData(obj).then(() => {
     res.status(200).end();
   }).catch(next);
 });

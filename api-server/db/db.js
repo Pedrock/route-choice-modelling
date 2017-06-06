@@ -63,6 +63,6 @@ module.exports.getEdgePoint = function goForward(edge) {
   return auxGetChoices(knex.raw('ARRAY[?]::integer[]', edge));
 };
 
-module.exports.storeData = function storeData(data) {
-  return Promise.resolve(data);
+module.exports.storeData = function storeData(obj) {
+  return knex.selectRaw('insertCompletedSurvey(?)', JSON.stringify(obj));
 };
