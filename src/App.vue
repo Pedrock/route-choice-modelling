@@ -56,11 +56,12 @@
     },
   };
 </script>
-
-<style lang="less">
+<style>
   body {
     font-family: 'Avenir', Helvetica, Arial, sans-serif;
   }
+</style>
+<style lang="scss" scoped>
   #app {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

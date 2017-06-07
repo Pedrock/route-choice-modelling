@@ -1,5 +1,6 @@
 'use strict';
 
+const _ = require('lodash');
 const knex = require('knex')(require('../../knexfile'));
 
 knex.selectRaw = function selectRaw(...args) {
@@ -46,8 +47,8 @@ FROM (
     const edges = rows[0].edge === null
       ? []
       : rows.map((row) => {
-        const { edge, polyline } = row;
-        return { id: edge, polyline };
+        const { edge, polyline, endpoint_lat, endpoint_lng } = row;
+        return { id: edge, polyline, lat: endpoint_lat, lng: endpoint_lng };
       });
     return { location, edges };
   });
@@ -61,6 +62,38 @@ module.exports.getEdgePoint = function goForward(edge) {
   return auxGetChoices(knex.raw('ARRAY[?]::integer[]', edge));
 };
 
+module.exports.edgeArrayToEdgepoints = function edgeArrayToEdgepoints(edgeArray) {
+  return knex
+  .selectRaw(`edgeid, path, latitude, longitude, placeid
+    FROM (
+      SELECT edgeid, array_agg(latitude || ',' || longitude ORDER BY index) AS path
+      FROM edgepoints
+      JOIN points ON (pointid = points.id)
+      WHERE edgeid = ANY(?)
+      GROUP BY edgeid
+    ) aux
+    LEFT JOIN gmaps_edges USING (edgeid)`, [edgeArray]);
+};
+
 module.exports.storeData = function storeData(obj) {
   return knex.selectRaw('insertCompletedSurvey(?)', JSON.stringify(obj));
+};
+
+module.exports.storeGmapsEdges = function storeGmapsEdges(edges) {
+  if (!edges.length) {
+    return Promise.resolve();
+  }
+
+  const rows = edges.map((edge) => {
+    const lastPoint = _.last(edge.snappedPoints);
+    return {
+      edgeid: edge.edgeid,
+      placeid: lastPoint.placeId,
+      latitude: lastPoint.location.latitude,
+      longitude: lastPoint.location.longitude,
+      snappedpoints: JSON.stringify(edge.snappedPoints),
+    };
+  });
+  return knex.raw(`${knex('gmaps_edges').insert(rows)} ON CONFLICT DO NOTHING`)
+  .catch(console.error);
 };

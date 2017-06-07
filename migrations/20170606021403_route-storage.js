@@ -13,12 +13,12 @@ exports.up = function up(knex) {
   );`)
   .raw(`CREATE TABLE surveys_routes (
     id SERIAL PRIMARY KEY,
-    survey_id INTEGER REFERENCES surveys(id),
-    initialEdge INTEGER,
-    finalEdge INTEGER,
-    help BOOLEAN,
-    path INTEGER[],
-    numKnownRoutes VARCHAR(3)
+    survey_id INTEGER NOT NULL REFERENCES surveys(id),
+    initialEdge INTEGER NOT NULL,
+    finalEdge INTEGER NOT NULL,
+    help BOOLEAN NOT NULL,
+    path INTEGER[] NOT NULL,
+    numKnownRoutes VARCHAR(3) NOT NULL
   );`)
   .raw(`CREATE OR REPLACE FUNCTION insertCompletedSurvey(json_obj json) RETURNS VOID AS $BODY$
   DECLARE

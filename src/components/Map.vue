@@ -1,5 +1,5 @@
 <template>
-  <div id="maps">
+  <div id="maps" :class="{'help-visible': currentRouteInfo.help || true }">
     <div class="overlay" v-if="hasArrived">
       <div>
         <p class="overlay-title">You have arrived at the destination!</p>
@@ -14,6 +14,10 @@
       </div>
     </div>
     <div id="pano" ref="pano"></div>
+    <div id="time-help" v-if="currentRouteInfo.help || true">
+      <el-card>A</el-card>
+      <el-card>B</el-card>
+    </div>
     <div id="map" ref="map" v-show="!this.hasFinished"></div>
   </div>
 </template>
@@ -53,8 +57,9 @@
   const currentEdgeStyle = createRouteStyle([200, 200, 0, 0.8]);
 
   const getData = (next) => {
-    const edge = store.getters.currentRouteInfo.initialEdge;
-    Vue.axios.get(`edge?id=${edge}`)
+    const info = store.getters.currentRouteInfo;
+    const { initialEdge, finalEdge } = info;
+    Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}`)
     .then(res => next(vm => vm.initialDataReceived(res.data)))
     .catch((err) => {
       next((vm) => {
@@ -175,7 +180,7 @@
           layers: [this.vectorLayer],
         });
         this.olClick = new ol.interaction.Select({
-          condition: ol.events.condition.doubleClick,
+          condition: ol.events.condition.click,
           layers: [this.vectorLayer],
         });
         this.olmap.addInteraction(this.olHover);
@@ -209,13 +214,18 @@
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
       },
       onRouteClick(e) {
-        if (e.selected[0]) {
+        if (e.selected[0] && !this.loading && !this.rotating) {
+          this.loading = true;
           const edge = e.selected[0].getId();
-          this.axios.get(`forward?edge=${edge}`).then((res) => {
+          const { finalEdge } = this.currentRouteInfo;
+          this.axios.get(`forward?edge=${edge}&dest=${finalEdge}`)
+          .then((res) => {
             this.data = res.data;
             this.rotating = true;
             this.addToPath(res.data.location.path);
             this.olmap.getView().rotateSmooth(-this.data.location.heading).then(() => {
+              this.olHover.getFeatures().clear();
+              this.olClick.getFeatures().clear();
               this.rotating = false;
             });
           }).catch((err) => {
@@ -226,6 +236,7 @@
             };
             this.$notify.error(notification);
           }).then(() => {
+            this.loading = false;
             this.olHover.getFeatures().clear();
             this.olClick.getFeatures().clear();
           });
@@ -236,8 +247,8 @@
         (() => {
           if (this.nextRouteInfo) {
             this.loading = true;
-            const edge = store.getters.nextRouteInfo.initialEdge;
-            return this.axios.get(`edge?id=${edge}`)
+            const { initialEdge, finalEdge } = store.getters.nextRouteInfo;
+            return this.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}`)
             .then(res => this.initialDataReceived(res.data));
           }
           return this.sendAllInfo();
@@ -315,14 +326,43 @@
   };
 </script>
 
-<style lang="less">
+<style lang="scss">
   #maps {
     height: 100%;
     position: relative;
 
+    #time-help {
+      position: absolute;
+      right: 0;
+      top: 200px;
+      border: 1px solid red;
+      z-index: 2;
+      width: 200px;
+      height: calc(100% - 200px);
+      box-sizing: border-box;
+      padding: 0 10px;
+      .el-card {
+        margin-top: 10px;
+        text-align: center;
+        cursor: pointer;
+        &:hover:not(:active) {
+          background-color: #eee;
+        }
+        .el-card__body {
+          padding: 15px 5px;
+        }
+      }
+    }
+
     #pano, .overlay {
       width: 100%;
       height: 100%;
+    }
+
+    &.help-visible {
+      #pano, .overlay {
+        width: calc(100% - 200px);
+      }
     }
 
     .overlay-title {

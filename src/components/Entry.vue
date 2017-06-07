@@ -52,6 +52,7 @@
         </el-form>
       </el-row>
     </div>
+    <el-button type="primary" @click="submitForm(form)" class="next-button">Next</el-button>
   </div>
 </template>
 
@@ -145,7 +146,7 @@
   };
 </script>
 
-<style lang="less" scoped>
+<style lang="scss" scoped>
   .header {
     text-align: center;
     padding: 20px 20px 30px 20px;
@@ -156,7 +157,7 @@
   }
 </style>
 
-<style lang="less">
+<style lang="scss" scoped>
   .el-form-item__content {
     line-height: 0;
   }
