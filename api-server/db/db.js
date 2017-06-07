@@ -83,7 +83,6 @@ module.exports.storeGmapsEdges = function storeGmapsEdges(edges) {
   if (!edges.length) {
     return Promise.resolve();
   }
-
   const rows = edges.map((edge) => {
     const lastPoint = _.last(edge.snappedPoints);
     return {
@@ -95,5 +94,20 @@ module.exports.storeGmapsEdges = function storeGmapsEdges(edges) {
     };
   });
   return knex.raw(`${knex('gmaps_edges').insert(rows)} ON CONFLICT DO NOTHING`)
+  .catch(console.error);
+};
+
+module.exports.getGmapsDistances = function getGmapsDistances(pairs) {
+  return knex.selectRaw(`*
+    FROM gmaps_distances
+    WHERE ARRAY[ARRAY[fromedgeid, toedgeid]] <@ ?;
+  `, [pairs]);
+};
+
+module.exports.storeGmapsDistances = function storeGmapsDistances(rows) {
+  if (!rows.length) {
+    return Promise.resolve();
+  }
+  return knex.raw(`${knex('gmaps_distances').insert(rows)} ON CONFLICT DO NOTHING`)
   .catch(console.error);
 };

@@ -8,8 +8,12 @@ const googleMapsClient = require('@google/maps').createClient({
 });
 
 
-const distancesRequest = (origins, destinations) =>
-  googleMapsClient.distanceMatrix({ origins, destinations }).asPromise().then(r => r.json);
+const distancesRequest = (origins, destinations) => {
+  if (origins.length === 0 || destinations.length === 0) {
+    return Promise.resolve(null);
+  }
+  return googleMapsClient.distanceMatrix({ origins, destinations }).asPromise().then(r => r.json);
+};
 
 const roadsRequest = path => googleMapsClient.snapToRoads({ path }).asPromise().then(r => r.json);
 
@@ -51,17 +55,49 @@ module.exports.addTimeToEdgesInfo = function addTimeToEdgesInfo(info, destinatio
   getEdgesCoords(neededEdges)
   .then((places) => {
     const origin = places[originEdge].location;
-    const intermediatePoints = edgeChoices.map(edge => places[edge].location);
     const destination = places[destinationEdge].location;
 
-    return Promise.all([
-      distancesRequest([origin], intermediatePoints), // returns 1 row with N elements
-      distancesRequest(intermediatePoints, [destination]), // returns N rows with 1 element
-    ]);
+    const pairs = [
+      ...edgeChoices.map(toedgeid => ([originEdge, toedgeid])),
+      ...edgeChoices.map(fromedgeid => ([fromedgeid, destinationEdge])),
+    ];
+    return db.getGmapsDistances(pairs)
+    .then((cachedDistances) => {
+      const unknownPairs = _.differenceWith(pairs, cachedDistances,
+        (pair, cached) => pair[0] === cached.fromedgeid && pair[1] === cached.toedgeid);
+      const unknownA = unknownPairs.filter(pair => pair[0] === originEdge)
+      .map(pair => places[pair[1]].location);
+      const unknownB = unknownPairs.filter(pair => pair[1] === destinationEdge)
+      .map(pair => places[pair[0]].location);
+
+      return Promise.all([
+        distancesRequest([origin], unknownA), // returns 1 row with N elements
+        distancesRequest(unknownB, [destination]), // returns N rows with 1 element
+        Promise.resolve(cachedDistances),
+      ]);
+    });
   })
-  .then(([response1, response2]) => {
-    console.log(JSON.stringify(response1, null, 4));
-    console.log(JSON.stringify(response2, null, 4));
+  .then(([resultsOrigin, resultsDest, cachedDistances]) => {
+    const arr1 = resultsOrigin === null
+      ? []
+      : _.zipWith(resultsOrigin.rows[0].elements, edgeChoices,
+        (elem, toedgeid) => Object.assign({ fromedgeid: originEdge, toedgeid }, elem));
+    const arr2 = resultsDest === null
+      ? []
+      : _.zipWith(resultsDest.rows.map(r => r.elements[0]), edgeChoices,
+        (elem, fromedgeid) => Object.assign({ fromedgeid, toedgeid: destinationEdge }, elem));
+
+    const results = [...arr1, ...arr2].map(r => ({
+      fromedgeid: r.fromedgeid,
+      toedgeid: r.toedgeid,
+      distance: r.distance.value,
+      duration: r.duration.value,
+    }));
+    db.storeGmapsDistances(results);
+
+    const all = results.concat(cachedDistances);
+
+    console.log(JSON.stringify(all, null, 4));
   });
 
   return info;

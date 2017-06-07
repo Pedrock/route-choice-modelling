@@ -12,7 +12,7 @@ router.get('/', (req, res, next) => {
   }
 
   db.goForward(req.query.edge)
-  .then(info => addTimeToEdgesInfo(info, req.query.dest))
+  .then(info => addTimeToEdgesInfo(info, Number(req.query.dest)))
   .then((info) => {
     res.status(200).json(info).end();
   }).catch(next);
