@@ -15,44 +15,33 @@ const distancesRequest = (origins, destinations) => {
   return googleMapsClient.distanceMatrix({ origins, destinations }).asPromise().then(r => r.json);
 };
 
-const roadsRequest = path => googleMapsClient.snapToRoads({ path }).asPromise().then(r => r.json);
+const roadsRequest = path =>
+  googleMapsClient.snapToRoads({ path, interpolate: true })
+  .asPromise().then(r => r.json);
 
-function getEdgesCoords(inputEdges) {
-  return db.edgeArrayToEdgepoints(inputEdges)
-  .then((edges) => {
-    const cachedResults = _(edges)
-    .filter(edge => edge.placeid !== null)
-    .map(({ edgeid, latitude, longitude, placeid }) => ({
-      edgeid,
-      location: { latitude, longitude },
-      placeId: placeid,
-    }))
-    .keyBy('edgeid')
-    .value();
-
-    const newEdges = edges.filter(({ edgeid }) => cachedResults[edgeid] === undefined);
-
-    return Promise.all(newEdges.map(edge => roadsRequest(edge.path)))
-    .then((results) => {
-      db.storeGmapsEdges(_.zipWith(results, newEdges,
-        (r, { edgeid }) => Object.assign(r, { edgeid })));
-      return results;
-    })
-    .then(results => results.map(({ snappedPoints }) => _.pick(_.last(snappedPoints), ['location', 'placeId'])))
-    .then(results => _.zipObject(newEdges.map(e => e.edgeid), results))
-    .then(results => Object.assign({}, cachedResults, results));
-  });
+function getGoogleEdgesCoords(inputEdges) {
+  return db.getUnknownEdges(inputEdges)
+  .then(unknownEdges =>
+    Promise.all(unknownEdges.map(edge => roadsRequest(edge.path)))
+    .then(results => db.storeGmapsEdges(_.zipWith(results, unknownEdges,
+      (r, { edgeid }) => Object.assign(r, { edgeid })))))
+  .then(() => db.getGmapsEdges(inputEdges))
+  .then(results => _.keyBy(results, 'edgeid'));
 }
 
-module.exports.addTimeToEdgesInfo = function addTimeToEdgesInfo(info, destinationEdge) {
-  if (!info.edges.length) return info;
+function getGoogleLocation(edge) {
+  return getGoogleEdgesCoords([edge]).then(places => _.pick(places[edge], ['lat', 'lng']));
+}
+
+function getEdgesWithTimeInfo(info, destinationEdge) {
+  if (!info.edges.length) return info.edges;
 
   const originEdge = info.location.edge;
   const edgeChoices = info.edges.map(edge => edge.id);
 
   const neededEdges = [originEdge, ...edgeChoices, destinationEdge];
 
-  getEdgesCoords(neededEdges)
+  return getGoogleEdgesCoords(neededEdges)
   .then((places) => {
     const origin = places[originEdge].location;
     const destination = places[destinationEdge].location;
@@ -61,6 +50,7 @@ module.exports.addTimeToEdgesInfo = function addTimeToEdgesInfo(info, destinatio
       ...edgeChoices.map(toedgeid => ([originEdge, toedgeid])),
       ...edgeChoices.map(fromedgeid => ([fromedgeid, destinationEdge])),
     ];
+
     return db.getGmapsDistances(pairs)
     .then((cachedDistances) => {
       const unknownPairs = _.differenceWith(pairs, cachedDistances,
@@ -93,12 +83,34 @@ module.exports.addTimeToEdgesInfo = function addTimeToEdgesInfo(info, destinatio
       distance: r.distance.value,
       duration: r.duration.value,
     }));
-    db.storeGmapsDistances(results);
+    db.storeGmapsDistances(results).catch(console.error);
+    return results.concat(cachedDistances);
+  })
+  .then(arr => _.keyBy(arr, e => `${e.fromedgeid},${e.toedgeid}`))
+  .then(distances => info.edges.map((e) => {
+    const part1 = distances[`${originEdge},${e.id}`];
+    const part2 = distances[`${e.id},${destinationEdge}`];
+    return Object.assign({}, e, {
+      distance: part1.distance + part2.distance,
+      duration: part1.duration + part2.duration,
+    });
+  }));
+}
 
-    const all = results.concat(cachedDistances);
+module.exports.addPlaceIdAndDistances = function addPlaceIdAndDistances(info, destinationEdge) {
+  return Promise.all([
+    getGoogleLocation(info.location.edge),
+    getEdgesWithTimeInfo(info, destinationEdge),
+  ]).then(([googleLocation, edges]) => ({
+    location: Object.assign({}, info.location, googleLocation),
+    edges,
+  }));
+};
 
-    console.log(JSON.stringify(all, null, 4));
-  });
-
-  return info;
+module.exports.addLocation = function routeWithInformation(info) {
+  return getGoogleLocation(info.location.edge)
+  .then(googleLocation => ({
+    location: Object.assign({}, info.location, googleLocation),
+    edges: info.edges,
+  }));
 };

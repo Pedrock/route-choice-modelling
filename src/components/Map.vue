@@ -1,24 +1,24 @@
 <template>
-  <div id="maps" :class="{'help-visible': currentRouteInfo.help || true }">
+  <div id="maps" :class="{'help-visible': hasHelp }">
     <div class="overlay" v-if="hasArrived">
-      <div>
+      <div><div>
         <p class="overlay-title">You have arrived at the destination!</p>
         <p>How many routes do you know from the starting point to this destination?</p>
         <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
         <el-button type="primary" :loading="loading" @click="nextClick">Next <i class="el-icon-arrow-right el-icon-right"></i></el-button>
-      </div>
+      </div></div>
     </div>
     <div class="overlay" v-if="hasFinished">
-      <div>
-        <p class="overlay-title">You are done! Thank you for your time!</p>
-      </div>
+      <div><div>
+          <p class="overlay-title">You are done! Thank you for your time!</p>
+      </div></div>
     </div>
-    <div id="pano" ref="pano"></div>
-    <div id="time-help" v-if="currentRouteInfo.help || true">
+    <div id="pano" ref="pano" v-once></div>
+    <div id="map" ref="map" v-show="!this.hasFinished" v-once></div>
+    <div id="time-help" v-if="hasHelp">
       <el-card>A</el-card>
       <el-card>B</el-card>
     </div>
-    <div id="map" ref="map" v-show="!this.hasFinished"></div>
   </div>
 </template>
 
@@ -91,6 +91,7 @@
         'hasFinished',
         'nextRouteInfo',
         'step',
+        'hasHelp',
       ]),
       location() {
         if (!this.data) {
@@ -218,7 +219,7 @@
           this.loading = true;
           const edge = e.selected[0].getId();
           const { finalEdge } = this.currentRouteInfo;
-          this.axios.get(`forward?edge=${edge}&dest=${finalEdge}`)
+          this.axios.get(`edge?forward=${edge}&dest=${finalEdge}`)
           .then((res) => {
             this.data = res.data;
             this.rotating = true;
@@ -288,6 +289,11 @@
           this.olmap.getView().setRotation(-this.heading);
         }
       },
+      hasHelp() {
+        setTimeout(() => {
+          window.google.maps.event.trigger(this.pano, 'resize');
+        });
+      },
     },
     mounted() {
       if (window.vueGoogleMapsInit) {
@@ -335,12 +341,12 @@
       position: absolute;
       right: 0;
       top: 200px;
-      border: 1px solid red;
       z-index: 2;
       width: 200px;
       height: calc(100% - 200px);
       box-sizing: border-box;
       padding: 0 10px;
+      overflow-y: auto;
       .el-card {
         margin-top: 10px;
         text-align: center;
@@ -360,7 +366,7 @@
     }
 
     &.help-visible {
-      #pano, .overlay {
+      #pano, .overlay > div {
         width: calc(100% - 200px);
       }
     }
@@ -374,13 +380,17 @@
       position: absolute;
       z-index: 3;
       background-color: rgba(255, 255, 255, 0.7);
-      display: table;
       > div {
-        display: table-cell;
-        vertical-align: middle;
-        text-align: center;
-        font-weight: bold;
-        padding-bottom: 1em;
+        display: table;
+        height: 100%;
+        width: 100%;
+        > div {
+          display: table-cell;
+          vertical-align: middle;
+          text-align: center;
+          font-weight: bold;
+          padding-bottom: 1em;
+        }
       }
       .el-input-number {
         display: block;

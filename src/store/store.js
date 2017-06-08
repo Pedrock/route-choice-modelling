@@ -13,8 +13,8 @@ export default new Vuex.Store({
     currentRoute: 0,
     routes: [],
     routesInfo: [
-      { help: false, initialEdge: -1071423, finalEdge: 1910834 },
-      { help: true, initialEdge: 1071423, finalEdge: -1071423 },
+      { help: true, initialEdge: -1071423, finalEdge: 1910834 },
+      { help: false, initialEdge: 1071423, finalEdge: -1071423 },
     ],
     arrived: false,
   },
@@ -42,6 +42,11 @@ export default new Vuex.Store({
     },
     nextRouteInfo(state) {
       return state.routesInfo[state.currentRoute + 1];
+    },
+    hasHelp(state) {
+      return state.routesInfo[state.currentRoute]
+        ? state.routesInfo[state.currentRoute].help
+        : false;
     },
   },
   mutations: {
