@@ -40,8 +40,14 @@
       this.$router.afterEach(() => {
         this.$Progress.finish();
       });
-      this.$router.onError(() => {
+      this.$router.onError((err) => {
         this.$Progress.fail();
+        console.error(err);
+        const notification = {
+          title: 'An error occurred!',
+          message: 'Please try again.',
+        };
+        this.$notify.error(notification);
       });
     },
     computed: {

@@ -14,7 +14,7 @@
       </div></div>
     </div>
     <div id="pano" ref="pano" v-once></div>
-    <div id="map" ref="map" v-show="!this.hasFinished" v-once></div>
+    <div id="map" ref="map" v-show="!hasFinished" v-once></div>
     <div id="time-help" v-if="hasHelp">
       <el-card v-for="edge in edgesWithTime"
                :class="{ 'route-hover': edge.id === hoveredEdge }"
@@ -27,6 +27,7 @@
   import ol from 'openlayers';
   import Vue from 'vue';
   import { mapActions, mapGetters, mapMutations } from 'vuex';
+  import { Loading } from 'element-ui';
   import store from '@/store/store';
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
@@ -69,14 +70,7 @@
     edgeRequest({ initialEdge })
     .then(res => next(vm => vm.initialDataReceived(res.data)))
     .catch((err) => {
-      next((vm) => {
-        console.error(err);
-        const notification = {
-          title: 'An error occurred!',
-          message: 'Please try again.',
-        };
-        vm.$notify.error(notification);
-      });
+      next(err);
     });
   };
 
@@ -235,7 +229,6 @@
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
       },
       onRouteHover(e) {
-        console.log(e.selected[0]);
         if (e.selected[0]) {
           this.hoveredEdge = e.selected[0].getId();
         } else {
@@ -273,8 +266,8 @@
       nextClick() {
         this.addAnswer(this.questionAnswer);
         (() => {
+          this.loading = true;
           if (this.nextRouteInfo) {
-            this.loading = true;
             const { initialEdge } = store.getters.nextRouteInfo;
             return edgeRequest({ initialEdge })
             .then(res => this.initialDataReceived(res.data));
@@ -282,7 +275,6 @@
           return this.sendAllInfo();
         })().then(() => {
           this.nextRoute();
-          this.loading = false;
           this.questionAnswer = null;
           this.olmap.renderSync();
         }).catch((err) => {
@@ -292,6 +284,8 @@
             message: 'Please try again.',
           };
           this.$notify.error(notification);
+        }).then(() => {
+          this.loading = false;
         });
       },
     },
@@ -320,6 +314,18 @@
         setTimeout(() => {
           window.google.maps.event.trigger(this.pano, 'resize');
         });
+      },
+      loading() {
+        if (!this.loading && this.loadingService) {
+          this.loadingService.close();
+          this.loadingService = null;
+        } else if (this.loading && !this.loadingService) {
+          this.loadingService = Loading.service({
+            target: this.$refs.map,
+            body: true,
+            fullscreen: false,
+          });
+        }
       },
     },
     mounted() {
