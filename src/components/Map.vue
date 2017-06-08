@@ -16,8 +16,9 @@
     <div id="pano" ref="pano" v-once></div>
     <div id="map" ref="map" v-show="!this.hasFinished" v-once></div>
     <div id="time-help" v-if="hasHelp">
-      <el-card>A</el-card>
-      <el-card>B</el-card>
+      <el-card v-for="edge in edgesWithTime"
+               :class="{ 'route-hover': edge.id === hoveredEdge }"
+               :key="edge.id">{{edge.value}}</el-card>
     </div>
   </div>
 </template>
@@ -30,6 +31,12 @@
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
 
+  const edgeRequest = ({ forward, initialEdge }) => {
+    const { finalEdge, help } = store.getters.currentRouteInfo;
+    if (forward) return Vue.axios.get(`edge?forward=${forward}&dest=${finalEdge}${help ? '&help=1' : ''}`);
+    if (initialEdge) return Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}${help ? '&help=1' : ''}`);
+    return null;
+  };
 
   ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
     return new Promise((resolve) => {
@@ -58,15 +65,15 @@
 
   const getData = (next) => {
     const info = store.getters.currentRouteInfo;
-    const { initialEdge, finalEdge } = info;
-    Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}`)
+    const { initialEdge } = info;
+    edgeRequest({ initialEdge })
     .then(res => next(vm => vm.initialDataReceived(res.data)))
     .catch((err) => {
       next((vm) => {
         console.error(err);
         const notification = {
           title: 'An error occurred!',
-          message: 'Please try again later.',
+          message: 'Please try again.',
         };
         vm.$notify.error(notification);
       });
@@ -82,6 +89,7 @@
         rotating: false,
         loading: false,
         questionAnswer: null,
+        hoveredEdge: null,
       };
     },
     computed: {
@@ -112,6 +120,17 @@
           heading: (180 * heading || 0) / Math.PI,
           pitch: 0,
         };
+      },
+      edgesWithTime() {
+        if (!this.data || !this.data.edges || this.hasArrived) return [];
+        return this.data.edges.map((edge, index) => {
+          const minutes = Math.floor(edge.duration / 60);
+          const seconds = edge.duration % 60;
+          return {
+            id: edge.id,
+            value: `${String.fromCharCode(65 + index)} - ${minutes}m${seconds}s`,
+          };
+        });
       },
     },
     methods: {
@@ -187,6 +206,7 @@
         this.olmap.addInteraction(this.olHover);
         this.olmap.addInteraction(this.olClick);
         this.olClick.on('select', this.onRouteClick.bind(this));
+        this.olHover.on('select', this.onRouteHover.bind(this));
       },
       updatePolylines() {
         this.vectorSource.clear();
@@ -214,12 +234,19 @@
         this.data = data;
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
       },
+      onRouteHover(e) {
+        console.log(e.selected[0]);
+        if (e.selected[0]) {
+          this.hoveredEdge = e.selected[0].getId();
+        } else {
+          this.hoveredEdge = null;
+        }
+      },
       onRouteClick(e) {
         if (e.selected[0] && !this.loading && !this.rotating) {
           this.loading = true;
           const edge = e.selected[0].getId();
-          const { finalEdge } = this.currentRouteInfo;
-          this.axios.get(`edge?forward=${edge}&dest=${finalEdge}`)
+          edgeRequest({ forward: edge })
           .then((res) => {
             this.data = res.data;
             this.rotating = true;
@@ -233,7 +260,7 @@
             console.error(err);
             const notification = {
               title: 'An error occurred!',
-              message: 'Please try again later.',
+              message: 'Please try again.',
             };
             this.$notify.error(notification);
           }).then(() => {
@@ -248,8 +275,8 @@
         (() => {
           if (this.nextRouteInfo) {
             this.loading = true;
-            const { initialEdge, finalEdge } = store.getters.nextRouteInfo;
-            return this.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}`)
+            const { initialEdge } = store.getters.nextRouteInfo;
+            return edgeRequest({ initialEdge })
             .then(res => this.initialDataReceived(res.data));
           }
           return this.sendAllInfo();
@@ -262,7 +289,7 @@
           console.error(err);
           const notification = {
             title: 'An error occurred!',
-            message: 'Please try again later.',
+            message: 'Please try again.',
           };
           this.$notify.error(notification);
         });
@@ -350,9 +377,12 @@
       .el-card {
         margin-top: 10px;
         text-align: center;
-        cursor: pointer;
-        &:hover:not(:active) {
+        transition: transform 0.1s ease-in-out;
+        // cursor: pointer;
+        /*&:hover:not(:active)*/
+        &.route-hover {
           background-color: #eee;
+          transform: scale(1.05);
         }
         .el-card__body {
           padding: 15px 5px;

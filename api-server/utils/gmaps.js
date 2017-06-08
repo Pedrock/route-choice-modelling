@@ -43,8 +43,8 @@ function getEdgesWithTimeInfo(info, destinationEdge) {
 
   return getGoogleEdgesCoords(neededEdges)
   .then((places) => {
-    const origin = places[originEdge].location;
-    const destination = places[destinationEdge].location;
+    const origin = places[originEdge];
+    const destination = places[destinationEdge];
 
     const pairs = [
       ...edgeChoices.map(toedgeid => ([originEdge, toedgeid])),
@@ -56,35 +56,34 @@ function getEdgesWithTimeInfo(info, destinationEdge) {
       const unknownPairs = _.differenceWith(pairs, cachedDistances,
         (pair, cached) => pair[0] === cached.fromedgeid && pair[1] === cached.toedgeid);
       const unknownA = unknownPairs.filter(pair => pair[0] === originEdge)
-      .map(pair => places[pair[1]].location);
+      .map(pair => places[pair[1]]);
       const unknownB = unknownPairs.filter(pair => pair[1] === destinationEdge)
-      .map(pair => places[pair[0]].location);
+      .map(pair => places[pair[0]]);
 
       return Promise.all([
         distancesRequest([origin], unknownA), // returns 1 row with N elements
         distancesRequest(unknownB, [destination]), // returns N rows with 1 element
-        Promise.resolve(cachedDistances),
-      ]);
-    });
-  })
-  .then(([resultsOrigin, resultsDest, cachedDistances]) => {
-    const arr1 = resultsOrigin === null
-      ? []
-      : _.zipWith(resultsOrigin.rows[0].elements, edgeChoices,
-        (elem, toedgeid) => Object.assign({ fromedgeid: originEdge, toedgeid }, elem));
-    const arr2 = resultsDest === null
-      ? []
-      : _.zipWith(resultsDest.rows.map(r => r.elements[0]), edgeChoices,
-        (elem, fromedgeid) => Object.assign({ fromedgeid, toedgeid: destinationEdge }, elem));
+      ]).then(([resultsOrigin, resultsDest]) => {
+        const arr1 = resultsOrigin === null
+          ? []
+          : _.zipWith(resultsOrigin.rows[0].elements, unknownA.map(e => e.edgeid),
+            (elem, toedgeid) => Object.assign({ fromedgeid: originEdge, toedgeid }, elem));
+        const arr2 = resultsDest === null
+          ? []
+          : _.zipWith(resultsDest.rows.map(r => r.elements[0]), unknownB.map(e => e.edgeid),
+            (elem, fromedgeid) => Object.assign({ fromedgeid, toedgeid: destinationEdge }, elem));
 
-    const results = [...arr1, ...arr2].map(r => ({
-      fromedgeid: r.fromedgeid,
-      toedgeid: r.toedgeid,
-      distance: r.distance.value,
-      duration: r.duration.value,
-    }));
-    db.storeGmapsDistances(results).catch(console.error);
-    return results.concat(cachedDistances);
+        const results = [...arr1, ...arr2]
+        .map(r => ({
+          fromedgeid: r.fromedgeid,
+          toedgeid: r.toedgeid,
+          distance: r.distance.value,
+          duration: r.duration.value,
+        }));
+        db.storeGmapsDistances(results).catch(console.error);
+        return results.concat(cachedDistances);
+      });
+    });
   })
   .then(arr => _.keyBy(arr, e => `${e.fromedgeid},${e.toedgeid}`))
   .then(distances => info.edges.map((e) => {
