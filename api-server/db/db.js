@@ -50,7 +50,7 @@ module.exports.goForward = function goForward(edgeId) {
   return auxGetChoices(knex.raw('getPathToIntersectionFromEdge(?)', edgeId));
 };
 
-module.exports.getEdgePoint = function goForward(edge) {
+module.exports.getEdgeInfo = function getEdgeInfo(edge) {
   return auxGetChoices(knex.raw('ARRAY[?]::integer[]', edge));
 };
 

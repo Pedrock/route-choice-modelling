@@ -13,7 +13,7 @@ export default new Vuex.Store({
     currentRoute: 0,
     routes: [],
     routesInfo: [
-      { help: true, initialEdge: -1071423, finalEdge: 1910834 },
+      { help: true, initialEdge: -1071423, finalEdge: 1910834, previewDestination: true },
       { help: false, initialEdge: 1071423, finalEdge: -1071423 },
     ],
     arrived: false,

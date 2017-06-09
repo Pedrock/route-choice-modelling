@@ -1,5 +1,9 @@
 <template>
-  <div id="maps" :class="{'help-visible': hasHelp }">
+  <div id="maps" :class="{'help-visible': hasHelp && !destinationPreview }">
+    <div id="dest-prev-overlay" v-show="destinationPreview">
+      <el-button type="primary" @click="() => destinationPreview = false">Start <i class="el-icon-arrow-right el-icon-right"></i></el-button>
+      <p>This is where you need to go to.</p>
+    </div>
     <div class="overlay" v-if="hasArrived">
       <div><div>
         <p class="overlay-title">You have arrived at the destination!</p>
@@ -22,7 +26,7 @@
         </div>
       </div>
     </transition>
-    <div id="time-help" v-if="hasHelp">
+    <div id="time-help" v-if="hasHelp && !destinationPreview">
       <el-card v-for="edge in edgesWithTime"
                :class="{ 'route-hover': edge.id === hoveredEdge }"
                :key="edge.id">{{edge.value}}</el-card>
@@ -72,9 +76,9 @@
 
   const getData = (next) => {
     const info = store.getters.currentRouteInfo;
-    const { initialEdge } = info;
+    const { initialEdge, previewDestination } = info;
     edgeRequest({ initialEdge })
-    .then(res => next(vm => vm.initialDataReceived(res.data)))
+    .then(res => next(vm => vm.initialDataReceived(res.data, previewDestination)))
     .catch((err) => {
       next(err);
     });
@@ -90,6 +94,7 @@
         loading: false,
         questionAnswer: null,
         hoveredEdge: null,
+        destinationPreview: false,
       };
     },
     computed: {
@@ -104,6 +109,12 @@
       location() {
         if (!this.data) {
           return { lat: 0, lng: 0 };
+        }
+        if (this.destinationPreview) {
+          return {
+            lat: Number(this.data.dest.lat),
+            lng: Number(this.data.dest.lng),
+          };
         }
         return {
           lat: Number(this.data.location.lat),
@@ -128,7 +139,7 @@
           const seconds = edge.duration % 60;
           return {
             id: edge.id,
-            value: `${String.fromCharCode(65 + index)} - ${minutes}m${seconds}s`,
+            value: `${String.fromCharCode(65 + index)} - ${minutes}m ${seconds}s`,
           };
         });
       },
@@ -229,7 +240,8 @@
         });
         return new ol.Feature({ geometry: line });
       },
-      initialDataReceived(data) {
+      initialDataReceived(data, previewDestination) {
+        this.destinationPreview = previewDestination;
         this.olmap.getView().setRotation(-data.location.heading);
         this.data = data;
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
@@ -274,9 +286,9 @@
         (() => {
           this.loading = true;
           if (this.nextRouteInfo) {
-            const { initialEdge } = store.getters.nextRouteInfo;
+            const { initialEdge, previewDestination } = store.getters.nextRouteInfo;
             return edgeRequest({ initialEdge })
-            .then(res => this.initialDataReceived(res.data));
+            .then(res => this.initialDataReceived(res.data, previewDestination));
           }
           return this.sendAllInfo();
         })().then(() => {
@@ -446,9 +458,26 @@
       background-color: rgba(255,255,255,.9);
       transition: opacity .3s;
     }
-    
+
     .fade-enter, .fade-leave-to {
       opacity: 0
+    }
+
+    #dest-prev-overlay {
+      position: absolute;
+      z-index: 2;
+      background-color: rgba(255,255,255,.7);
+      width: calc(100% - 200px);
+      text-align: center;
+      font-weight: bold;
+
+      .el-button {
+        float: right;
+        margin: 10px;
+      }
+      > p {
+        padding: 3px 0;
+      }
     }
   }
 </style>

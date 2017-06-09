@@ -32,6 +32,7 @@ function getGoogleEdgesCoords(inputEdges) {
 function getGoogleLocation(edge) {
   return getGoogleEdgesCoords([edge]).then(places => _.pick(places[edge], ['lat', 'lng']));
 }
+module.exports.getGoogleLocation = getGoogleLocation;
 
 function getEdgesWithTimeInfo(info, destinationEdge) {
   if (!info.edges.length) return info.edges;
@@ -96,7 +97,7 @@ function getEdgesWithTimeInfo(info, destinationEdge) {
   }));
 }
 
-module.exports.addPlaceIdAndDistances = function addPlaceIdAndDistances(info, destinationEdge) {
+module.exports.addLocationAndDistances = function addLocationAndDistances(info, destinationEdge) {
   return Promise.all([
     getGoogleLocation(info.location.edge),
     getEdgesWithTimeInfo(info, destinationEdge),
