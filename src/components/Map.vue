@@ -15,6 +15,13 @@
     </div>
     <div id="pano" ref="pano" v-once></div>
     <div id="map" ref="map" v-show="!hasFinished" v-once></div>
+    <transition name="fade">
+      <div id="map-loading-mask" v-show="loading && !hasArrived">
+        <div class="el-loading-spinner">
+          <svg viewBox="25 25 50 50" class="circular"><circle cx="50" cy="50" r="20" fill="none" class="path"></circle></svg>
+        </div>
+      </div>
+    </transition>
     <div id="time-help" v-if="hasHelp">
       <el-card v-for="edge in edgesWithTime"
                :class="{ 'route-hover': edge.id === hoveredEdge }"
@@ -27,7 +34,6 @@
   import ol from 'openlayers';
   import Vue from 'vue';
   import { mapActions, mapGetters, mapMutations } from 'vuex';
-  import { Loading } from 'element-ui';
   import store from '@/store/store';
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
@@ -315,18 +321,6 @@
           window.google.maps.event.trigger(this.pano, 'resize');
         });
       },
-      loading() {
-        if (!this.loading && this.loadingService) {
-          this.loadingService.close();
-          this.loadingService = null;
-        } else if (this.loading && !this.loadingService) {
-          this.loadingService = Loading.service({
-            target: this.$refs.map,
-            body: true,
-            fullscreen: false,
-          });
-        }
-      },
     },
     mounted() {
       if (window.vueGoogleMapsInit) {
@@ -436,14 +430,25 @@
       }
     }
 
-    #map {
+    #map, #map-loading-mask {
       position: absolute;
       height: 200px;
       width: 200px;
       top: 0;
       right: 0;
+    }
+    #map {
       z-index: 1;
       background-color: #ccc;
+    }
+    #map-loading-mask {
+      z-index: 10;
+      background-color: rgba(255,255,255,.9);
+      transition: opacity .3s;
+    }
+    
+    .fade-enter, .fade-leave-to {
+      opacity: 0
     }
   }
 </style>
