@@ -31,8 +31,8 @@ exports.up = function up(knex) {
 
 exports.down = function down(knex) {
   return knex.schema
-  .raw('DROP TABLE gmaps_edges')
-  .raw('DROP TABLE gmaps_distances')
   .raw('DROP TRIGGER trigger_gmaps_edges_insert ON gmaps_edges')
-  .raw('DROP FUNCTION on_gmaps_edges_insert()');
+  .raw('DROP FUNCTION on_gmaps_edges_insert()')
+  .raw('DROP TABLE gmaps_edges')
+  .raw('DROP TABLE gmaps_distances');
 };

@@ -23,20 +23,20 @@
           <el-form-item label="Place of birth (district)" prop="birth">
             <el-select v-model="form.birth" placeholder="Select">
               <el-option
-                v-for="item in options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value">
+                v-for="item in districts"
+                :key="item"
+                :label="item"
+                :value="item">
               </el-option>
             </el-select>
           </el-form-item>
           <el-form-item label="Locality (district)" prop="locality">
             <el-select v-model="form.locality" placeholder="Select">
               <el-option
-                v-for="item in options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value">
+                v-for="item in districts"
+                :key="item"
+                :label="item"
+                :value="item">
               </el-option>
             </el-select>
           </el-form-item>
@@ -52,7 +52,6 @@
         </el-form>
       </el-row>
     </div>
-    <el-button type="primary" @click="submitForm(form)" class="next-button">Next</el-button>
   </div>
 </template>
 
@@ -77,58 +76,27 @@
           age: { required: true },
           experience: { required: true },
         },
-        options: [{
-          value: 'aveiro',
-          label: 'Aveiro',
-        }, {
-          value: 'braga',
-          label: 'Braga',
-        }, {
-          value: 'braganca',
-          label: 'Bragança',
-        }, {
-          value: 'castelo-branco',
-          label: 'Castelo Branco',
-        }, {
-          value: 'coimbra',
-          label: 'Coimbra',
-        }, {
-          value: 'evora',
-          label: 'Évora',
-        }, {
-          value: 'faro',
-          label: 'Faro',
-        }, {
-          value: 'guarda',
-          label: 'Guarda',
-        }, {
-          value: 'leiria',
-          label: 'Leiria',
-        }, {
-          value: 'lisboa',
-          label: 'Lisboa',
-        }, {
-          value: 'portalegre',
-          label: 'Portalegre',
-        }, {
-          value: 'porto',
-          label: 'Porto',
-        }, {
-          value: 'santarem',
-          label: 'Santarem',
-        }, {
-          value: 'setubal',
-          label: 'Setubal',
-        }, {
-          value: 'viana-do-castelo',
-          label: 'Viana do Castelo',
-        }, {
-          value: 'vila-real',
-          label: 'Vila Real',
-        }, {
-          value: 'viseu',
-          label: 'Viseu',
-        }],
+        districts: [
+          'Açores',
+          'Aveiro',
+          'Braga',
+          'Bragança',
+          'Castelo Branco',
+          'Coimbra',
+          'Évora',
+          'Faro',
+          'Guarda',
+          'Leiria',
+          'Lisboa',
+          'Madeira',
+          'Portalegre',
+          'Porto',
+          'Santarem',
+          'Setubal',
+          'Viana do Castelo',
+          'Vila Real',
+          'Viseu',
+        ],
       };
     },
     methods: {
@@ -163,5 +131,8 @@
   }
   .el-form-item:not(:first-child) {
     margin-top: 40px;
+  }
+  .el-input-number {
+    width: 221px;
   }
 </style>

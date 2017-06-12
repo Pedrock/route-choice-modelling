@@ -76,12 +76,17 @@ module.exports.getGmapsEdges = function getGmapsEdges(edges) {
   return knex.selectRaw(`
     edgeid, ST_Y(point) AS lat, ST_X(point) AS lng
     FROM (
-      SELECT edgeid,
-        ST_LineInterpolatePoint(geometry, CASE WHEN ST_Length(geometry, TRUE) <= 8 THEN 0
-                                          ELSE (ST_Length(geometry, TRUE) - 8) / ST_Length(geometry, TRUE) END) AS point
-      FROM gmaps_edges
-      WHERE edgeid = ANY(?)
-    ) aux;
+        SELECT edgeid,
+          ST_LineInterpolatePoint(geom, CASE WHEN ST_Length(geom, TRUE) <= 8 THEN 0
+                                        ELSE (ST_Length(geom, TRUE) - 8) / ST_Length(geom, TRUE) END) AS point
+        FROM (
+            SELECT edgeid,
+              CASE WHEN ST_Length(g.geometry, TRUE) = 0 THEN edges.geometry ELSE g.geometry END as geom
+            FROM gmaps_edges g
+            INNER JOIN edges ON (edgeid = edges.id)
+            WHERE edgeid = ANY(?)
+          ) e
+      ) aux;
   `, [edges]);
 };
 

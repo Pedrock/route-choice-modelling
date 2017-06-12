@@ -1,14 +1,20 @@
 <template>
   <div id="maps" :class="{'help-visible': hasHelp && !destinationPreview }">
     <div id="dest-prev-overlay" v-show="destinationPreview">
-      <el-button type="primary" @click="() => destinationPreview = false">Start <i class="el-icon-arrow-right el-icon-right"></i></el-button>
-      <p>This is where you need to go to.</p>
+      <el-button type="primary" @click="() => destinationPreview = false">Start Simulation <i class="el-icon-arrow-right el-icon-right"></i></el-button>
+      <p>This is where you need to go to:</p>
+      <p v-text="currentRouteInfo.destinationName"></p>
     </div>
     <div class="overlay" v-if="hasArrived">
       <div><div>
         <p class="overlay-title">You have arrived at the destination!</p>
-        <p>How many routes do you know from the starting point to this destination?</p>
-        <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
+        <template v-if="currentRouteInfo.askNumberRoutes">
+          <p>How many routes do you know from the starting point to this destination?</p>
+          <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
+        </template>
+        <p v-if="currentRouteInfo.extraInformation"
+           class="extra-info"
+           v-html="currentRouteInfo.extraInformation"></p>
         <el-button type="primary" :loading="loading" @click="nextClick">Next <i class="el-icon-arrow-right el-icon-right"></i></el-button>
       </div></div>
     </div>
@@ -42,11 +48,10 @@
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
 
-  const edgeRequest = ({ forward, initialEdge }) => {
-    const { finalEdge, help } = store.getters.currentRouteInfo;
+  const edgeRequest = (info, forward) => {
+    const { initialEdge, finalEdge, help } = info;
     if (forward) return Vue.axios.get(`edge?forward=${forward}&dest=${finalEdge}${help ? '&help=1' : ''}`);
-    if (initialEdge) return Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}${help ? '&help=1' : ''}`);
-    return null;
+    return Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}${help ? '&help=1' : ''}`);
   };
 
   ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
@@ -76,9 +81,8 @@
 
   const getData = (next) => {
     const info = store.getters.currentRouteInfo;
-    const { initialEdge, previewDestination } = info;
-    edgeRequest({ initialEdge })
-    .then(res => next(vm => vm.initialDataReceived(res.data, previewDestination)))
+    edgeRequest(info)
+    .then(res => next(vm => vm.initialDataReceived(res.data, info)))
     .catch((err) => {
       next(err);
     });
@@ -126,7 +130,12 @@
         return [lng, lat];
       },
       pov() {
-        const heading = this.data ? this.data.location.heading : 0;
+        let heading;
+        if (this.destinationPreview) {
+          heading = this.currentRouteInfo.previewHeading || 0;
+        } else {
+          heading = this.data ? this.data.location.heading : 0;
+        }
         return {
           heading: (180 * heading || 0) / Math.PI,
           pitch: 0,
@@ -223,14 +232,22 @@
         this.vectorSource.clear();
         this.currentEdgeSource.clear();
 
-        const currentEdge = this.createPolylineFeature(this.data.location.polyline);
-        this.currentEdgeSource.addFeature(currentEdge);
-
-        this.data.edges.forEach((edge) => {
+        const addChoice = (edge) => {
           const feature = this.createPolylineFeature(edge.polyline);
           feature.setId(edge.id);
           this.vectorSource.addFeature(feature);
-        });
+        };
+
+        if (!this.destinationPreview) {
+          if (!this.data.edges.length) {
+            const { polyline, edge } = this.data.location;
+            addChoice({ id: -edge, polyline });
+          } else {
+            const currentEdge = this.createPolylineFeature(this.data.location.polyline);
+            this.currentEdgeSource.addFeature(currentEdge);
+            this.data.edges.forEach(addChoice);
+          }
+        }
       },
       createPolylineFeature(polyline) {
         const format = new ol.format.Polyline();
@@ -240,8 +257,9 @@
         });
         return new ol.Feature({ geometry: line });
       },
-      initialDataReceived(data, previewDestination) {
-        this.destinationPreview = previewDestination;
+      initialDataReceived(data, info) {
+        this.destinationPreview = info.previewDestination;
+        this.heading = info.previewHeading || 0;
         this.olmap.getView().setRotation(-data.location.heading);
         this.data = data;
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
@@ -257,7 +275,7 @@
         if (e.selected[0] && !this.loading && !this.rotating) {
           this.loading = true;
           const edge = e.selected[0].getId();
-          edgeRequest({ forward: edge })
+          edgeRequest(this.currentRouteInfo, edge)
           .then((res) => {
             this.data = res.data;
             this.rotating = true;
@@ -286,9 +304,8 @@
         (() => {
           this.loading = true;
           if (this.nextRouteInfo) {
-            const { initialEdge, previewDestination } = store.getters.nextRouteInfo;
-            return edgeRequest({ initialEdge })
-            .then(res => this.initialDataReceived(res.data, previewDestination));
+            return edgeRequest(this.nextRouteInfo)
+            .then(res => this.initialDataReceived(res.data, this.nextRouteInfo));
           }
           return this.sendAllInfo();
         })().then(() => {
@@ -389,11 +406,10 @@
       .el-card {
         margin-top: 10px;
         text-align: center;
-        transition: transform 0.1s ease-in-out;
-        // cursor: pointer;
-        /*&:hover:not(:active)*/
+        transition: all 0.1s ease-in-out;
         &.route-hover {
-          background-color: #eee;
+          background-color: #ddd;
+          border-color: #555;
           transform: scale(1.05);
         }
         .el-card__body {
@@ -440,6 +456,12 @@
         max-width: 900px;
         margin: 20px auto;
       }
+      .extra-info {
+        margin-bottom: 40px;
+        br {
+          line-height: 30px;
+        }
+      }
     }
 
     #map, #map-loading-mask {
@@ -473,7 +495,7 @@
 
       .el-button {
         float: right;
-        margin: 10px;
+        margin: 10px 10px 40px;
       }
       > p {
         padding: 3px 0;
