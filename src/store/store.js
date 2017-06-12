@@ -6,16 +6,55 @@ import router from '../router';
 
 Vue.use(Vuex);
 
+function shuffle(array) {
+  let count = array.length;
+  let random;
+  let temp;
+  while (count) {
+    // eslint-disable-next-line no-bitwise
+    random = Math.random() * count-- | 0;
+    temp = array[count];
+    array[count] = array[random];
+    array[random] = temp;
+  }
+}
+
+const withHelpInfo = `You will now be challenged with arriving at the same destination, from the same starting point, but with some help.<br>
+That help consists of having at each intersection the estimated time to arrival for each of your options.`;
+
+const routes = [
+  {
+    initialEdge: 1708568, // Aliados
+    finalEdge: 1262042, // Casa da Música
+    destinationName: 'Casa da Música',
+    previewHeading: 1.1,
+  },
+  {
+    initialEdge: 1062916, // Estádio do Dragão
+    finalEdge: 1071422, // FEUP
+    destinationName: 'Faculdade de Engenharia da Universidade do Porto',
+    previewHeading: 1.2,
+  },
+];
+
+function getRoutes() {
+  shuffle(routes);
+  return routes.reduce((arr, route) =>
+    [
+      ...arr,
+      { ...route, previewDestination: true, extraInformation: withHelpInfo },
+      { ...route, help: true, askNumberRoutes: true },
+    ],
+    []);
+}
+
 export default new Vuex.Store({
   state: {
     step: 0,
     form: null,
     currentRoute: 0,
     routes: [],
-    routesInfo: [
-      { help: false, initialEdge: -1071423, finalEdge: 1910834 },
-      { help: true, initialEdge: 1071423, finalEdge: -1071423 },
-    ],
+    routesInfo: getRoutes(),
     arrived: false,
   },
   getters: {
@@ -42,6 +81,11 @@ export default new Vuex.Store({
     },
     nextRouteInfo(state) {
       return state.routesInfo[state.currentRoute + 1];
+    },
+    hasHelp(state) {
+      return state.routesInfo[state.currentRoute]
+        ? state.routesInfo[state.currentRoute].help
+        : false;
     },
   },
   mutations: {

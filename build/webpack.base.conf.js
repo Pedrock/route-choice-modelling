@@ -1,7 +1,8 @@
-var path = require('path')
-var utils = require('./utils')
-var config = require('../config')
-var vueLoaderConfig = require('./vue-loader.conf')
+const path = require('path');
+const utils = require('./utils');
+const config = require('../config');
+const vueLoaderConfig = require('./vue-loader.conf');
+const Dotenv = require('dotenv-webpack');
 
 function resolve (dir) {
   return path.join(__dirname, '..', dir)
@@ -25,6 +26,11 @@ module.exports = {
       '@': resolve('src')
     }
   },
+  plugins: [
+    new Dotenv({
+      safe: true
+    })
+  ],
   module: {
     rules: [
       {
@@ -64,4 +70,4 @@ module.exports = {
       }
     ]
   }
-}
+};

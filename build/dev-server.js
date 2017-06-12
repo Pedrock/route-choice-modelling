@@ -88,17 +88,21 @@ devMiddleware.waitUntilValid(() => {
   _resolve()
 });
 
-nodemon({
-  script: './api-server/api-server.js',
-  ext: 'js json'
-});
-nodemon.on('start', function () {
-  console.log('API server has started');
-}).on('quit', function () {
-  console.log('API server has quit');
-}).on('restart', function (files) {
-  console.log('API server restarted due to: ', files);
-});
+const args = process.argv.slice(2);
+if (!args.includes('--no-api')) {
+  nodemon({
+    script: './api-server/api-server.js',
+    ext: 'js json'
+  });
+  nodemon.on('start', function () {
+    console.log('API server has started');
+  }).on('quit', function () {
+    console.log('API server has quit');
+  }).on('restart', function (files) {
+    console.log('API server restarted due to: ', files);
+  });
+}
+
 
 const server = app.listen(port);
 

@@ -1,20 +1,42 @@
 <template>
-  <div id="maps">
+  <div id="maps" :class="{'help-visible': hasHelp && !destinationPreview }">
+    <div id="dest-prev-overlay" v-show="destinationPreview">
+      <el-button type="primary" @click="() => destinationPreview = false">Start Simulation <i class="el-icon-arrow-right el-icon-right"></i></el-button>
+      <p>This is where you need to go to:</p>
+      <p v-text="currentRouteInfo.destinationName"></p>
+    </div>
     <div class="overlay" v-if="hasArrived">
-      <div>
+      <div><div>
         <p class="overlay-title">You have arrived at the destination!</p>
-        <p>How many routes do you know from the starting point to this destination?</p>
-        <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
+        <template v-if="currentRouteInfo.askNumberRoutes">
+          <p>How many routes do you know from the starting point to this destination?</p>
+          <limited-number-input default="1" min="1" max="10" @input="value => { questionAnswer = value }"></limited-number-input>
+        </template>
+        <p v-if="currentRouteInfo.extraInformation"
+           class="extra-info"
+           v-html="currentRouteInfo.extraInformation"></p>
         <el-button type="primary" :loading="loading" @click="nextClick">Next <i class="el-icon-arrow-right el-icon-right"></i></el-button>
-      </div>
+      </div></div>
     </div>
     <div class="overlay" v-if="hasFinished">
-      <div>
-        <p class="overlay-title">You are done! Thank you for your time!</p>
-      </div>
+      <div><div>
+          <p class="overlay-title">You are done! Thank you for your time!</p>
+      </div></div>
     </div>
-    <div id="pano" ref="pano"></div>
-    <div id="map" ref="map" v-show="!this.hasFinished"></div>
+    <div id="pano" ref="pano" v-once></div>
+    <div id="map" ref="map" v-show="!hasFinished" v-once></div>
+    <transition name="fade">
+      <div id="map-loading-mask" v-show="loading && !hasArrived">
+        <div class="el-loading-spinner">
+          <svg viewBox="25 25 50 50" class="circular"><circle cx="50" cy="50" r="20" fill="none" class="path"></circle></svg>
+        </div>
+      </div>
+    </transition>
+    <div id="time-help" v-if="hasHelp && !destinationPreview">
+      <el-card v-for="edge in edgesWithTime"
+               :class="{ 'route-hover': edge.id === hoveredEdge }"
+               :key="edge.id">{{edge.value}}</el-card>
+    </div>
   </div>
 </template>
 
@@ -26,6 +48,11 @@
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
 
+  const edgeRequest = (info, forward) => {
+    const { initialEdge, finalEdge, help } = info;
+    if (forward) return Vue.axios.get(`edge?forward=${forward}&dest=${finalEdge}${help ? '&help=1' : ''}`);
+    return Vue.axios.get(`edge?id=${initialEdge}&dest=${finalEdge}${help ? '&help=1' : ''}`);
+  };
 
   ol.View.prototype.rotateSmooth = function rotateSmooth(desiredRotation) {
     return new Promise((resolve) => {
@@ -53,18 +80,11 @@
   const currentEdgeStyle = createRouteStyle([200, 200, 0, 0.8]);
 
   const getData = (next) => {
-    const edge = store.getters.currentRouteInfo.initialEdge;
-    Vue.axios.get(`edge?id=${edge}`)
-    .then(res => next(vm => vm.initialDataReceived(res.data)))
+    const info = store.getters.currentRouteInfo;
+    edgeRequest(info)
+    .then(res => next(vm => vm.initialDataReceived(res.data, info)))
     .catch((err) => {
-      next((vm) => {
-        console.error(err);
-        const notification = {
-          title: 'An error occurred!',
-          message: 'Please try again later.',
-        };
-        vm.$notify.error(notification);
-      });
+      next(err);
     });
   };
 
@@ -77,6 +97,8 @@
         rotating: false,
         loading: false,
         questionAnswer: null,
+        hoveredEdge: null,
+        destinationPreview: false,
       };
     },
     computed: {
@@ -86,10 +108,17 @@
         'hasFinished',
         'nextRouteInfo',
         'step',
+        'hasHelp',
       ]),
       location() {
         if (!this.data) {
           return { lat: 0, lng: 0 };
+        }
+        if (this.destinationPreview) {
+          return {
+            lat: Number(this.data.dest.lat),
+            lng: Number(this.data.dest.lng),
+          };
         }
         return {
           lat: Number(this.data.location.lat),
@@ -101,11 +130,27 @@
         return [lng, lat];
       },
       pov() {
-        const heading = this.data ? this.data.location.heading : 0;
+        let heading;
+        if (this.destinationPreview) {
+          heading = this.currentRouteInfo.previewHeading || 0;
+        } else {
+          heading = this.data ? this.data.location.heading : 0;
+        }
         return {
           heading: (180 * heading || 0) / Math.PI,
           pitch: 0,
         };
+      },
+      edgesWithTime() {
+        if (!this.data || !this.data.edges || this.hasArrived) return [];
+        return this.data.edges.map((edge, index) => {
+          const minutes = Math.floor(edge.duration / 60);
+          const seconds = edge.duration % 60;
+          return {
+            id: edge.id,
+            value: `${String.fromCharCode(65 + index)} - ${minutes}m ${seconds}s`,
+          };
+        });
       },
     },
     methods: {
@@ -175,25 +220,34 @@
           layers: [this.vectorLayer],
         });
         this.olClick = new ol.interaction.Select({
-          condition: ol.events.condition.doubleClick,
+          condition: ol.events.condition.click,
           layers: [this.vectorLayer],
         });
         this.olmap.addInteraction(this.olHover);
         this.olmap.addInteraction(this.olClick);
         this.olClick.on('select', this.onRouteClick.bind(this));
+        this.olHover.on('select', this.onRouteHover.bind(this));
       },
       updatePolylines() {
         this.vectorSource.clear();
         this.currentEdgeSource.clear();
 
-        const currentEdge = this.createPolylineFeature(this.data.location.polyline);
-        this.currentEdgeSource.addFeature(currentEdge);
-
-        this.data.edges.forEach((edge) => {
+        const addChoice = (edge) => {
           const feature = this.createPolylineFeature(edge.polyline);
           feature.setId(edge.id);
           this.vectorSource.addFeature(feature);
-        });
+        };
+
+        if (!this.destinationPreview) {
+          if (!this.data.edges.length) {
+            const { polyline, edge } = this.data.location;
+            addChoice({ id: -edge, polyline });
+          } else {
+            const currentEdge = this.createPolylineFeature(this.data.location.polyline);
+            this.currentEdgeSource.addFeature(currentEdge);
+            this.data.edges.forEach(addChoice);
+          }
+        }
       },
       createPolylineFeature(polyline) {
         const format = new ol.format.Polyline();
@@ -203,29 +257,43 @@
         });
         return new ol.Feature({ geometry: line });
       },
-      initialDataReceived(data) {
+      initialDataReceived(data, info) {
+        this.destinationPreview = info.previewDestination;
+        this.heading = info.previewHeading || 0;
         this.olmap.getView().setRotation(-data.location.heading);
         this.data = data;
         this.olmap.getView().setCenter(ol.proj.fromLonLat(this.openlayersLocation));
       },
-      onRouteClick(e) {
+      onRouteHover(e) {
         if (e.selected[0]) {
+          this.hoveredEdge = e.selected[0].getId();
+        } else {
+          this.hoveredEdge = null;
+        }
+      },
+      onRouteClick(e) {
+        if (e.selected[0] && !this.loading && !this.rotating) {
+          this.loading = true;
           const edge = e.selected[0].getId();
-          this.axios.get(`forward?edge=${edge}`).then((res) => {
+          edgeRequest(this.currentRouteInfo, edge)
+          .then((res) => {
             this.data = res.data;
             this.rotating = true;
             this.addToPath(res.data.location.path);
             this.olmap.getView().rotateSmooth(-this.data.location.heading).then(() => {
+              this.olHover.getFeatures().clear();
+              this.olClick.getFeatures().clear();
               this.rotating = false;
             });
           }).catch((err) => {
             console.error(err);
             const notification = {
               title: 'An error occurred!',
-              message: 'Please try again later.',
+              message: 'Please try again.',
             };
             this.$notify.error(notification);
           }).then(() => {
+            this.loading = false;
             this.olHover.getFeatures().clear();
             this.olClick.getFeatures().clear();
           });
@@ -234,25 +302,25 @@
       nextClick() {
         this.addAnswer(this.questionAnswer);
         (() => {
+          this.loading = true;
           if (this.nextRouteInfo) {
-            this.loading = true;
-            const edge = store.getters.nextRouteInfo.initialEdge;
-            return this.axios.get(`edge?id=${edge}`)
-            .then(res => this.initialDataReceived(res.data));
+            return edgeRequest(this.nextRouteInfo)
+            .then(res => this.initialDataReceived(res.data, this.nextRouteInfo));
           }
           return this.sendAllInfo();
         })().then(() => {
           this.nextRoute();
-          this.loading = false;
           this.questionAnswer = null;
           this.olmap.renderSync();
         }).catch((err) => {
           console.error(err);
           const notification = {
             title: 'An error occurred!',
-            message: 'Please try again later.',
+            message: 'Please try again.',
           };
           this.$notify.error(notification);
+        }).then(() => {
+          this.loading = false;
         });
       },
     },
@@ -277,6 +345,11 @@
           this.olmap.getView().setRotation(-this.heading);
         }
       },
+      hasHelp() {
+        setTimeout(() => {
+          window.google.maps.event.trigger(this.pano, 'resize');
+        });
+      },
     },
     mounted() {
       if (window.vueGoogleMapsInit) {
@@ -284,8 +357,9 @@
       } else {
         window.vueGoogleMapsInit = this.vueGoogleMapsInit;
         const googleMapScript = document.createElement('SCRIPT');
+        const gmapsKey = process.env.GMAPS_KEY;
         googleMapScript.setAttribute('src',
-          'https://maps.googleapis.com/maps/api/js?key=AIzaSyCp_m8y6LXatPYMMG5QYwJA6TvLEecQYU4&callback=vueGoogleMapsInit');
+          `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&callback=vueGoogleMapsInit`);
         googleMapScript.setAttribute('async', '');
         googleMapScript.setAttribute('defer', '');
         document.body.appendChild(googleMapScript);
@@ -314,14 +388,45 @@
   };
 </script>
 
-<style lang="less">
+<style lang="scss">
   #maps {
     height: 100%;
     position: relative;
 
+    #time-help {
+      position: absolute;
+      right: 0;
+      top: 200px;
+      z-index: 2;
+      width: 200px;
+      height: calc(100% - 200px);
+      box-sizing: border-box;
+      padding: 0 10px;
+      overflow-y: auto;
+      .el-card {
+        margin-top: 10px;
+        text-align: center;
+        transition: all 0.1s ease-in-out;
+        &.route-hover {
+          background-color: #ddd;
+          border-color: #555;
+          transform: scale(1.05);
+        }
+        .el-card__body {
+          padding: 15px 5px;
+        }
+      }
+    }
+
     #pano, .overlay {
       width: 100%;
       height: 100%;
+    }
+
+    &.help-visible {
+      #pano, .overlay > div {
+        width: calc(100% - 200px);
+      }
     }
 
     .overlay-title {
@@ -333,13 +438,17 @@
       position: absolute;
       z-index: 3;
       background-color: rgba(255, 255, 255, 0.7);
-      display: table;
       > div {
-        display: table-cell;
-        vertical-align: middle;
-        text-align: center;
-        font-weight: bold;
-        padding-bottom: 1em;
+        display: table;
+        height: 100%;
+        width: 100%;
+        > div {
+          display: table-cell;
+          vertical-align: middle;
+          text-align: center;
+          font-weight: bold;
+          padding-bottom: 1em;
+        }
       }
       .el-input-number {
         display: block;
@@ -347,16 +456,50 @@
         max-width: 900px;
         margin: 20px auto;
       }
+      .extra-info {
+        margin-bottom: 40px;
+        br {
+          line-height: 30px;
+        }
+      }
     }
 
-    #map {
+    #map, #map-loading-mask {
       position: absolute;
       height: 200px;
       width: 200px;
       top: 0;
       right: 0;
+    }
+    #map {
       z-index: 1;
       background-color: #ccc;
+    }
+    #map-loading-mask {
+      z-index: 10;
+      background-color: rgba(255,255,255,.9);
+      transition: opacity .3s;
+    }
+
+    .fade-enter, .fade-leave-to {
+      opacity: 0
+    }
+
+    #dest-prev-overlay {
+      position: absolute;
+      z-index: 2;
+      background-color: rgba(255,255,255,.7);
+      width: calc(100% - 200px);
+      text-align: center;
+      font-weight: bold;
+
+      .el-button {
+        float: right;
+        margin: 10px 10px 40px;
+      }
+      > p {
+        padding: 3px 0;
+      }
     }
   }
 </style>

@@ -40,8 +40,14 @@
       this.$router.afterEach(() => {
         this.$Progress.finish();
       });
-      this.$router.onError(() => {
+      this.$router.onError((err) => {
         this.$Progress.fail();
+        console.error(err);
+        const notification = {
+          title: 'An error occurred!',
+          message: 'Please try again.',
+        };
+        this.$notify.error(notification);
       });
     },
     computed: {
@@ -56,11 +62,12 @@
     },
   };
 </script>
-
-<style lang="less">
+<style>
   body {
     font-family: 'Avenir', Helvetica, Arial, sans-serif;
   }
+</style>
+<style lang="scss" scoped>
   #app {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
