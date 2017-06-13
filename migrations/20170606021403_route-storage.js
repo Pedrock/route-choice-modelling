@@ -30,7 +30,7 @@ exports.up = function up(knex) {
     RETURNING id INTO survey_id;
   
     INSERT INTO surveys_routes(survey_id, initialEdge, finalEdge, help, path, numKnownRoutes, index)
-    SELECT survey_id, "initialEdge", "finalEdge", help, path_array AS path, "numKnownRoutes", row_number() over() AS index
+    SELECT survey_id, "initialEdge", "finalEdge", COALESCE(help,FALSE) help, path_array AS path, "numKnownRoutes", row_number() over() AS index
     FROM json_array_elements(json_obj->'routes') routes
       CROSS JOIN json_to_record(routes) AS ("initialEdge" int, "finalEdge" int, help boolean, path json, "numKnownRoutes" varchar),
       LATERAL (
