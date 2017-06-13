@@ -48,6 +48,11 @@
   import { ADD_TO_PATH, NEXT_ROUTE, ADD_ANSWER } from '@/store/mutation-types';
   import LimitedNumberInput from './LimitedNumberInput';
 
+  const errorNotification = {
+    title: 'An error occurred!',
+    message: 'Please try again.',
+  };
+
   const edgeRequest = (info, forward) => {
     const { initialEdge, finalEdge, help } = info;
     if (forward) return Vue.axios.get(`edge?forward=${forward}&dest=${finalEdge}${help ? '&help=1' : ''}`);
@@ -99,6 +104,7 @@
         questionAnswer: null,
         hoveredEdge: null,
         destinationPreview: false,
+        choices: [], // Used for backtracking in case of dead ends
       };
     },
     computed: {
@@ -228,7 +234,7 @@
         this.olClick.on('select', this.onRouteClick.bind(this));
         this.olHover.on('select', this.onRouteHover.bind(this));
       },
-      updatePolylines() {
+      updatePolylines(backtrackIfDeadend = false) {
         this.vectorSource.clear();
         this.currentEdgeSource.clear();
 
@@ -239,13 +245,20 @@
         };
 
         if (!this.destinationPreview) {
-          if (!this.data.edges.length) {
-            const { polyline, edge } = this.data.location;
-            addChoice({ id: -edge, polyline });
+          const usefulEdges = this.data.edges.filter(edge => !edge.deadend);
+          if (!usefulEdges.length) {
+            const { polyline } = this.data.location;
+            if (backtrackIfDeadend) {
+              this.choices.pop();
+            }
+            const edge = this.choices[this.choices.length - 1];
+            if (edge) {
+              addChoice({ id: edge, polyline });
+            }
           } else {
             const currentEdge = this.createPolylineFeature(this.data.location.polyline);
             this.currentEdgeSource.addFeature(currentEdge);
-            this.data.edges.forEach(addChoice);
+            usefulEdges.forEach(addChoice);
           }
         }
       },
@@ -274,9 +287,19 @@
       onRouteClick(e) {
         if (e.selected[0] && !this.loading && !this.rotating) {
           this.loading = true;
-          const edge = e.selected[0].getId();
-          edgeRequest(this.currentRouteInfo, edge)
+          const edgeId = e.selected[0].getId();
+          edgeRequest(this.currentRouteInfo, edgeId)
           .then((res) => {
+            if (!res.data.edges.length) {
+              this.$notify.warning({
+                title: 'Dead End Street',
+                message: 'Please choose another option.',
+              });
+              const deadendEdge = this.data.edges.find(edge => edge.id === edgeId);
+              deadendEdge.deadend = true;
+              this.updatePolylines(true);
+              return;
+            }
             this.data = res.data;
             this.rotating = true;
             this.addToPath(res.data.location.path);
@@ -285,13 +308,10 @@
               this.olClick.getFeatures().clear();
               this.rotating = false;
             });
+            this.choices.push(edgeId);
           }).catch((err) => {
             console.error(err);
-            const notification = {
-              title: 'An error occurred!',
-              message: 'Please try again.',
-            };
-            this.$notify.error(notification);
+            this.$notify.error(errorNotification);
           }).then(() => {
             this.loading = false;
             this.olHover.getFeatures().clear();
@@ -310,15 +330,12 @@
           return this.sendAllInfo();
         })().then(() => {
           this.nextRoute();
+          this.choices = [];
           this.questionAnswer = null;
           this.olmap.renderSync();
         }).catch((err) => {
           console.error(err);
-          const notification = {
-            title: 'An error occurred!',
-            message: 'Please try again.',
-          };
-          this.$notify.error(notification);
+          this.$notify.error(errorNotification);
         }).then(() => {
           this.loading = false;
         });
