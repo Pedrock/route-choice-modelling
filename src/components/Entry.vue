@@ -1,5 +1,6 @@
 <template>
-  <div>
+  <div id="entry">
+    <p class="description">This project is designed to model human behavior and decision making at road intersections, with drivers making decisions with and without the help of an information system. You, as a driver, are invited to make journeys between specified origins and destinations under a range of travel scenarios in Oporto. There will be 4 rounds. Each user has two different sets of start and finish points, all well known locations in Oporto. For each set, you will first go through the route without the auxiliary information. After that you must arrive at the same destination but with the help of the information about the estimated time to the point of arrival for all the directions you may choose at any given intersection.</p>
     <div class="header">
       <strong>Entry form</strong>
     </div>
@@ -115,24 +116,41 @@
 </script>
 
 <style lang="scss" scoped>
+  #entry {
+    padding: 0 10px 30px;
+  }
+
+  .description {
+    padding: 20px;
+    margin: 0 auto;
+    max-width: 900px;
+    text-align: justify;
+    line-height: 1.5em;
+  }
+
   .header {
     text-align: center;
     padding: 20px 20px 30px 20px;
   }
+
   .next-button {
     right: 0;
     position: absolute;
   }
-</style>
 
-<style lang="scss" scoped>
   .el-form-item__content {
     line-height: 0;
   }
   .el-form-item:not(:first-child) {
-    margin-top: 40px;
+    margin-top: 30px;
   }
   .el-input-number {
-    width: 221px;
+    width: 100%;
+    margin-right: -82px;
+  }
+</style>
+<style lang="scss">
+  .el-form-item__error {
+    margin-right: -2px;
   }
 </style>
