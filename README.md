@@ -30,3 +30,9 @@ npm start
 ```
 
 For detailed explanation on how things work, checkout the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
+
+## Data
+
+You can download the CSV file from the _/api/csv_ endpoint.
+
+When prompted for a username and password, you should provide the ones specified in your .env file.
