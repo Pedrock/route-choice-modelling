@@ -120,3 +120,19 @@ module.exports.storeGmapsDistances = function storeGmapsDistances(rows) {
   }
   return knex.raw(`${knex('gmaps_distances').insert(rows)} ON CONFLICT DO NOTHING`);
 };
+
+module.exports.getChoices = function getChoices() {
+  return knex.raw(`WITH paths AS
+  (
+      SELECT surveys_routes.id, path_edge, path_edge_index
+      FROM surveys_routes
+        INNER JOIN surveys ON (surveys.id = survey_id)
+        CROSS JOIN unnest(path) WITH ORDINALITY a(path_edge, path_edge_index)
+      order by id, path_edge_index
+  )
+  SELECT a.id, age, gender, experience, help, locality, birth, a.path_edge fromedge, b.path_edge AS toedge
+  FROM paths a
+  INNER JOIN paths b ON (a.id = b.id AND a.path_edge_index + 1 = b.path_edge_index)
+  INNER JOIN surveys_routes ON (a.id = surveys_routes.id)
+  INNER JOIN surveys ON (surveys.id = survey_id);`).then(({ rows }) => rows);
+};
