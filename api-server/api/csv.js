@@ -21,17 +21,30 @@ const requireLogin = (req, res, next) => {
   }
 };
 
-router.get('/', requireLogin, (req, res, next) => {
+router.get('/choices', requireLogin, (req, res, next) => {
   db.getChoices()
   .then((rows) => {
-    res.attachment('data.csv');
+    res.attachment('choices.csv');
     res.write(`${columns.join(separator)}\n`);
-    rows.forEach((row) => {
-      res.write(`${columns.map(col => row[col]).join(separator)}\n`);
-    });
+    rows.forEach(row => res.write(`${columns.map(col => row[col]).join(separator)}\n`));
     res.end();
   })
   .catch(next);
+});
+
+router.get('/stats', requireLogin, (req, res, next) => {
+  db.getTravelledDistances()
+  .then((rows) => {
+    if (rows.length) {
+      res.attachment('stats.csv');
+      const cols = Object.keys(rows[0]);
+      res.write(`${cols.join(separator)}\n`);
+      rows.forEach(row => res.write(`${cols.map(col => row[col]).join(separator)}\n`));
+      res.end();
+    } else {
+      res.end('No data');
+    }
+  }).catch(next);
 });
 
 module.exports = router;

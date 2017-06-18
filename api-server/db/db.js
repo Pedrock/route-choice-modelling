@@ -136,3 +136,13 @@ module.exports.getChoices = function getChoices() {
   INNER JOIN surveys_routes ON (a.id = surveys_routes.id)
   INNER JOIN surveys ON (surveys.id = survey_id);`).then(({ rows }) => rows);
 };
+
+module.exports.getTravelledDistances = function getTravelledDistances() {
+  return knex.selectRaw(`
+  initialedge, finaledge, help, SUM(ST_LENGTH(geometry, true)) length, SUM(ST_LENGTH(geometry, true) / maxspeed * 60 / 1000) AS time
+  FROM surveys_routes
+  CROSS JOIN unnest(path) AS path_edge
+  INNER JOIN edges ON (edges.id = path_edge)
+  GROUP BY survey_id, index, initialedge, finaledge, help
+  ORDER BY length`);
+};

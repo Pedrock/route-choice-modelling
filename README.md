@@ -33,6 +33,6 @@ For detailed explanation on how things work, checkout the [guide](http://vuejs-t
 
 ## Data
 
-You can download the CSV file from the _/api/csv_ endpoint.
+You can download the CSV files from the _/api/csv/choices_ and _/api/csv/stats_ endpoints.
 
 When prompted for a username and password, you should provide the ones specified in your .env file.
