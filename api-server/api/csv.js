@@ -5,7 +5,7 @@ const router = express.Router();
 const db = require('../db/db');
 const auth = require('basic-auth');
 
-const columns = ['id', 'age', 'gender', 'experience', 'help', 'fromedge', 'toedge'];
+const columns = ['id', 'initialedge', 'finaledge', 'age', 'gender', 'experience', 'help', 'fromedge', 'toedge'];
 const separator = ',';
 
 const requireLogin = (req, res, next) => {
